@@ -84,7 +84,7 @@ function saveSettings() {
 /* ---------- ljud och tal ---------- */
 const voiceAudio = new Audio();
 let audioMap = {};
-const audioReady = fetch('5-speech-audio.json?v=3').then(r => r.ok ? r.json() : {}).then(data => { audioMap = data; }).catch(() => {});
+const audioReady = fetch('5-speech-audio.json?v=3').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {});
 for (let i = 1; i <= 2; i++) fetch('sp2-' + i + '.json?v=9').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {});
 for (let i = 3; i <= 8; i++) { const sc = document.createElement('script'); sc.src = 'sp3-' + i + '.js?v=10'; sc.onload = () => { Object.assign(audioMap, window.__clips || {}); }; document.head.appendChild(sc); }
 const OPK = { '+': 'plus', '−': 'minus', '×': 'gånger', '÷': 'delat med' };
