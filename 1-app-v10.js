@@ -84,9 +84,11 @@ function saveSettings() {
 /* ---------- ljud och tal ---------- */
 const voiceAudio = new Audio();
 let audioMap = {};
-const audioReady = fetch('5-speech-audio.json?v=3').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {});
-for (let i = 1; i <= 2; i++) fetch('sp2-' + i + '.json?v=9').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {});
-for (let i = 3; i <= 11; i++) { const sc = document.createElement('script'); sc.src = 'sp3-' + i + '.js?v=10'; sc.onload = () => { Object.assign(audioMap, window.__clips || {}); }; document.head.appendChild(sc); }
+const clipLoads = [fetch('5-speech-audio.json?v=3').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {})];
+for (let i = 1; i <= 2; i++) clipLoads.push(fetch('sp2-' + i + '.json?v=9').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {}));
+for (let i = 3; i <= 11; i++) clipLoads.push(new Promise(res => { const sc = document.createElement('script'); sc.src = 'sp3-' + i + '.js?v=10'; sc.onload = () => { Object.assign(audioMap, window.__clips || {}); res(); }; sc.onerror = () => res(); document.head.appendChild(sc); }));
+const audioReady = Promise.all(clipLoads);
+let clipsLoaded = false; audioReady.then(() => { clipsLoaded = true; });
 const OPK = { '+': 'plus', '−': 'minus', '×': 'gånger', '÷': 'delat med' };
 (function(){ const st = document.createElement('style'); st.textContent = 'button,.card,.key{touch-action:manipulation;-webkit-tap-highlight-color:transparent} .card{animation-duration:.15s} .card.correct{animation-duration:.35s} .card.wrong{animation-duration:.3s}'; document.head.appendChild(st); })();
 let speechDone = null;
@@ -138,6 +140,7 @@ function feedbackFx(right, parts, fallbackText) {
     return Promise.race([fx, new Promise(r => setTimeout(r, 500))]).then(() => speakSeq(parts, fallbackText));
 }
 function speak(text) {
+    if (!clipsLoaded) { const t0 = speechToken; return audioReady.then(() => { if (t0 === speechToken) return speak(text); }); }
     stopSpeech();
     if (!settings.speech || settings.volume === 0) return Promise.resolve();
     const token = speechToken;
@@ -180,6 +183,7 @@ function speak(text) {
     });
 }
 function speakSeq(parts, fallbackText) {
+    if (!clipsLoaded) { const t0 = speechToken; return audioReady.then(() => { if (t0 === speechToken) return speakSeq(parts, fallbackText); }); }
     stopSpeech();
     if (!settings.speech || settings.volume === 0) return Promise.resolve();
     if (!parts.every(k => audioMap[k])) return speak(fallbackText || parts.join(' '));
