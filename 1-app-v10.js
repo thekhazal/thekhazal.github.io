@@ -88,7 +88,7 @@ const audioReady = fetch('5-speech-audio.json?v=3').then(r => r.ok ? r.json() : 
 for (let i = 1; i <= 2; i++) fetch('sp2-' + i + '.json?v=9').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {});
 for (let i = 3; i <= 8; i++) { const sc = document.createElement('script'); sc.src = 'sp3-' + i + '.js?v=10'; sc.onload = () => { Object.assign(audioMap, window.__clips || {}); }; document.head.appendChild(sc); }
 const OPK = { '+': 'plus', '−': 'minus', '×': 'gånger', '÷': 'delat med' };
-(function(){ const st = document.createElement('style'); st.textContent = 'button,.card,.key{touch-action:manipulation;-webkit-tap-highlight-color:transparent} .card{animation-duration:.12s!important}'; document.head.appendChild(st); })();
+(function(){ const st = document.createElement('style'); st.textContent = 'button,.card,.key{touch-action:manipulation;-webkit-tap-highlight-color:transparent} .card{animation-duration:.15s} .card.correct{animation-duration:.35s} .card.wrong{animation-duration:.3s}'; document.head.appendChild(st); })();
 let speechDone = null;
 let speechToken = 0;
 let talking = false;
@@ -305,7 +305,7 @@ async function onCardTap(key, btn) {
     stopSpeech();
     const current = scene;
     const picked = (game.values || []).find(v => v.key === key);
-    const choice = game.cat === 'siffror' ? ['siffran', String(key)] : game.cat === 'bokstaver' ? ['bokstaven', String(key).toLowerCase()] : game.cat === 'ord' ? ['ordet', String(key).toLowerCase()] : [picked && picked.name];
+    const choice = game.cat === 'figurer' || game.cat === 'djur' ? [picked && picked.name] : [String(key).toLowerCase()];
     const askKey = audioMap[game.target.speech] ? [game.target.speech] : [];
     const said = String(picked && picked.speech ? picked.speech : '').replace(/^Hitta /, '');
     const asked = String(game.target.speech || '').replace(/^Hitta /, '');
