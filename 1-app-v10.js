@@ -306,6 +306,7 @@ function startGame(cat) {
 async function onCardTap(key, btn) {
     if (game.locked) return;
     clearTimeout(roundTimer); clearTimeout(feedbackTimer);
+    document.querySelectorAll('.card.wrong').forEach(el => el.classList.remove('wrong'));
     stopSpeech();
     const current = scene;
     const picked = (game.values || []).find(v => v.key === key);
