@@ -114,7 +114,7 @@ function stopSpeech() {
     try { if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); lastCancelAt = Date.now(); } } catch (e) {}
     if (speechDone) { speechDone(); speechDone = null; }
     talking = false;
-    ['clickSound', 'matchSound'].forEach(id => { const a = document.getElementById(id); if(a) a.pause(); });
+    ['clickSound', 'matchSound', 'rightSound', 'wrongSound'].forEach(id => { const a = document.getElementById(id); if(a) a.pause(); });
     applyMusic();
 }
 function leaveScene() {
@@ -131,6 +131,11 @@ function playSound(id) {
         audio.play().catch(resolve);
         setTimeout(resolve, 1800);
     });
+}
+function feedbackFx(right, parts, fallbackText) {
+    const fx = playSound(right ? 'rightSound' : 'wrongSound');
+    if (!settings.speech) return fx;
+    return Promise.race([fx, new Promise(r => setTimeout(r, 500))]).then(() => speakSeq(parts, fallbackText));
 }
 function speak(text) {
     stopSpeech();
@@ -302,7 +307,7 @@ async function onCardTap(key, btn) {
     const picked = (game.values || []).find(v => v.key === key);
     const choice = game.cat === 'siffror' ? ['siffran', String(key)] : game.cat === 'bokstaver' ? ['bokstaven', String(key).toLowerCase()] : game.cat === 'ord' ? ['ordet', String(key).toLowerCase()] : [picked && picked.name];
     const askKey = audioMap[game.target.speech] ? [game.target.speech] : [];
-    const said = 'Du valde ' + String(picked && picked.speech ? picked.speech : '').replace(/^Hitta /, '');
+    const said = String(picked && picked.speech ? picked.speech : '').replace(/^Hitta /, '');
     const asked = String(game.target.speech || '').replace(/^Hitta /, '');
     if (key === game.target.key) {
         game.locked = true; game.stars++; saveProgress();
@@ -311,12 +316,12 @@ async function onCardTap(key, btn) {
         if (score) score.textContent = '★ ' + game.stars;
         confettiBurst(); setFeedback('Bra jobbat! 🎉', 'good');
         const minPause = new Promise(r => setTimeout(r, 250));
-        await Promise.all([settings.speech ? speakSeq(['Du valde'].concat(choice, ['Rätt!']), said + '. Rätt!') : playSound('matchSound'), minPause]);
+        await Promise.all([feedbackFx(true, choice.concat(['Rätt!']), said + '. Rätt!'), minPause]);
         if (current !== scene || !game.cat) return;
         game.round++; newRound();
     } else {
         btn.classList.add('wrong'); setFeedback('Försök igen!', 'bad');
-        speakSeq(['Du valde'].concat(choice, ['Nej, det är fel.']), said + '. Nej, det är fel.');
+        feedbackFx(false, choice.concat(['Nej, det är fel.']), said + '. Nej, det är fel.');
         feedbackTimer = setTimeout(() => { if (current === scene) { btn.classList.remove('wrong'); setFeedback('', ''); } }, 450);
     }
 }
@@ -401,11 +406,11 @@ function renderWrite() {
             hintLine.classList.add('done');
             const sc = document.querySelector('.stars'); if (sc) sc.textContent = '★ ' + game.stars;
             confettiBurst(); setFeedback('Bra jobbat! 🎉', 'good');
-            await Promise.all([settings.speech ? speakSeq(['Du skrev', it.answer, 'Rätt!'], 'Du skrev ' + v + '. Rätt!') : playSound('matchSound'), new Promise(r => setTimeout(r, 250))]);
+            await Promise.all([feedbackFx(true, [it.answer, 'Rätt!'], v + '. Rätt!'), new Promise(r => setTimeout(r, 250))]);
             if (current !== scene || game.cat !== 'skriv') return;
             game.round++; newWriteRound();
         } else {
-            input.classList.add('bad'); setFeedback('Försök igen!', 'bad'); { const sp = v.split(''); const spell = sp.length <= 12 && sp.every(ch => audioMap[ch]); speakSeq((spell ? ['Du skrev'].concat(sp) : []).concat(['Nej, det är fel.']), 'Du skrev ' + v + '. Nej, det är fel.'); }
+            input.classList.add('bad'); setFeedback('Försök igen!', 'bad'); { const sp = v.split(''); const spell = sp.length <= 12 && sp.every(ch => audioMap[ch]); feedbackFx(false, (spell ? sp : []).concat(['Nej, det är fel.']), v + '. Nej, det är fel.'); }
             setTimeout(() => { input.classList.remove('bad'); setFeedback('', ''); }, 450);
         }
     }
@@ -509,7 +514,7 @@ function renderMath() {
         if (game.locked) return;
         if (k === 'del') math.typed = math.typed.slice(0, -1);
         else if (k === 'ok') { check(); return; }
-        else if (math.typed.length < 2) { math.typed = (math.typed + k).replace(/^0+(?=\d)/, ''); clearTimeout(roundTimer); speakSeq([k], k); }
+        else if (math.typed.length < 2) { math.typed = (math.typed + k).replace(/^0+(?=\d)/, ''); clearTimeout(roundTimer); speakSeq([math.typed], math.typed); }
         refresh();
     }
     ['1','2','3','4','5','6','7','8','9','del','0','ok'].forEach(k => {
@@ -532,11 +537,11 @@ function renderMath() {
             ansEl.classList.add('ok');
             const sc = document.querySelector('.stars'); if (sc) sc.textContent = '★ ' + game.stars;
             confettiBurst(); setFeedback('Bra jobbat! 🎉', 'good');
-            await Promise.all([settings.speech ? speakSeq(['Du svarade', math.typed, 'Rätt!'], 'Du svarade ' + math.typed + '. Rätt!') : playSound('matchSound'), new Promise(r => setTimeout(r, 250))]);
+            await Promise.all([feedbackFx(true, [math.typed, 'Rätt!'], math.typed + '. Rätt!'), new Promise(r => setTimeout(r, 250))]);
             if (current !== scene || !MATH_CATS.includes(game.cat)) return;
             game.round++; newMathRound();
         } else {
-            ansEl.classList.add('bad'); setFeedback('Försök igen!', 'bad'); speakSeq(['Du svarade', math.typed, 'Nej, det är fel.'], 'Du svarade ' + math.typed + '. Nej, det är fel.');
+            ansEl.classList.add('bad'); setFeedback('Försök igen!', 'bad'); feedbackFx(false, [math.typed, 'Nej, det är fel.'], math.typed + '. Nej, det är fel.');
             setTimeout(() => { ansEl.classList.remove('bad'); math.typed = ''; refresh(); setFeedback('', ''); }, 450);
         }
     }
