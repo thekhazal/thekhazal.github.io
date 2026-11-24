@@ -327,6 +327,8 @@ function renderWrite() {
         if (v === it.answer) {
             game.locked = true; game.stars++; saveProgress();
             input.classList.add('ok'); input.blur();
+            hintLine.textContent = it.mode === 'word' ? it.answer.split('').join(' ').toUpperCase() : it.answer;
+            hintLine.classList.add('done');
             const sc = document.querySelector('.stars'); if (sc) sc.textContent = '★ ' + game.stars;
             confettiBurst(); setFeedback('Bra jobbat! 🎉', 'good');
             await Promise.all([settings.speech ? speak('Bra jobbat!') : playSound('matchSound'), new Promise(r => setTimeout(r, 1000))]);
