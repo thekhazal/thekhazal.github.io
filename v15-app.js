@@ -1,7 +1,7 @@
 /* Celia och Selmas Spel.
    Ren HTML/CSS/JS, inga externa tjänster förutom teckensnitt och egna ljudfiler. */
 
-(function(){ const st = document.createElement('style'); st.textContent = '.tile.mat{background:linear-gradient(160deg,#ff8d8d,#ee5a6f)}.tile.saker{background:linear-gradient(160deg,#5ed0d8,#2aa7c9)}.tile.kroppen{background:linear-gradient(160deg,#ffa8cf,#f06aa8)}.tile.klockan{background:linear-gradient(160deg,#6c8cf0,#3f5bd6)}.tile.klockan2{background:linear-gradient(160deg,#ffc15e,#f08a24)}.tile.text{background:linear-gradient(160deg,#b58cf5,#7e4fd8)}.tile.monster{background:linear-gradient(160deg,#5ed0a0,#25a07a)}.tile.para{background:linear-gradient(160deg,#ff9cc0,#e8587f)}.tile.pussel{background:linear-gradient(160deg,#7fd1ff,#3a9ee0)}.tile.ballong{background:linear-gradient(160deg,#ff8d8d,#ee5a6f)}'; document.head.appendChild(st); })();
+(function(){ const st = document.createElement('style'); st.textContent = '.tile.mat{background:linear-gradient(160deg,#ff8d8d,#ee5a6f)}.tile.saker{background:linear-gradient(160deg,#5ed0d8,#2aa7c9)}.tile.kroppen{background:linear-gradient(160deg,#ffa8cf,#f06aa8)}.tile.klockan{background:linear-gradient(160deg,#6c8cf0,#3f5bd6)}.tile.klockan2{background:linear-gradient(160deg,#ffc15e,#f08a24)}.tile.text{background:linear-gradient(160deg,#b58cf5,#7e4fd8)}.tile.monster{background:linear-gradient(160deg,#5ed0a0,#25a07a)}.tile.para{background:linear-gradient(160deg,#ff9cc0,#e8587f)}.tile.pussel{background:linear-gradient(160deg,#7fd1ff,#3a9ee0)}.tile.ballong{background:linear-gradient(160deg,#ff8d8d,#ee5a6f)}.nx-exhaust{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff3d0;border:2px dashed #f5a623;border-radius:16px;padding:8px 12px;margin:8px 0;font-weight:700;font-size:15px;color:#2d2a32}.nx-exhaust-btn{padding:6px 14px;font-size:14px;min-height:0}'; document.head.appendChild(st); })();
 /* ---------- språk: svenska och irakisk arabiska ---------- */
 let lang = 'sv';
 try { lang = localStorage.getItem('cs-lang') === 'ar' ? 'ar' : 'sv'; } catch (e) {}
@@ -500,13 +500,11 @@ function rememberKey(cat, key, keep) {
 }
 function isRecent(cat, key) { return (recentKeys[cat] || []).includes(key); }
 
-function buildRound() {
+function buildRound(scope) {
     const cat = game.cat;
     const n = settings.cardCount;
-    let values = [];
-
-    const hit = (kind) => T('Hitta ' + kind);
     const mk = (face, key, prompt, name, say, parts) => ({ face, key, prompt, name, say, parts, speech: parts.join(' ') });
+    let poolKeys = null, byKey = null, count = n;
     if (cat === 'siffror') {
         const min = settings.minRange, max = settings.maxRange;
         if (isNaN(min) || isNaN(max) || min >= max || (max - min + 1) < n) {
@@ -514,31 +512,37 @@ function buildRound() {
         }
         const pool = [];
         for (let i = min; i <= max; i++) pool.push(String(i));
-        values = sample(pool, n).map(v => { const o = mk(v, v, T('Hitta siffran'), undefined, N(v), [T('Hitta siffran'), N(v)]); if (lang !== 'ar') { o.speech = 'Hitta siffran ' + v; } return o; });
+        poolKeys = pool;
+        byKey = v => { const o = mk(v, v, T('Hitta siffran'), undefined, N(v), [T('Hitta siffran'), N(v)]); if (lang !== 'ar') { o.speech = 'Hitta siffran ' + v; } return o; };
     } else if (cat === 'bokstaver') {
-        if (lang === 'ar') values = sample(AR_LETTERS, n).map(([f, nm]) => mk(f, f, T('Hitta bokstaven'), undefined, nm, [T('Hitta bokstaven'), nm]));
-        else values = sample(LETTERS, n).map(v => ({ face: v, key: v, prompt: 'Hitta bokstaven', say: v.toLowerCase(), speech: 'Hitta bokstaven ' + v }));
+        if (lang === 'ar') { poolKeys = AR_LETTERS.map(x => x[0]); byKey = f => { const row = AR_LETTERS.find(x => x[0] === f) || [f, f]; return mk(f, f, T('Hitta bokstaven'), undefined, row[1], [T('Hitta bokstaven'), row[1]]); }; }
+        else { poolKeys = LETTERS; byKey = v => ({ face: v, key: v, prompt: 'Hitta bokstaven', say: v.toLowerCase(), speech: 'Hitta bokstaven ' + v }); }
     } else if (cat === 'ord') {
-        if (lang === 'ar') values = sample(AR_WORDS, n).map(v => mk(v, v, T('Hitta ordet'), undefined, v, [T('Hitta ordet'), v]));
-        else values = sample(WORDS, n).map(v => ({ face: v, key: v, prompt: 'Hitta ordet', say: v.toLowerCase(), speech: 'Hitta ordet ' + v }));
+        if (lang === 'ar') { poolKeys = AR_WORDS; byKey = v => mk(v, v, T('Hitta ordet'), undefined, v, [T('Hitta ordet'), v]); }
+        else { poolKeys = WORDS; byKey = v => ({ face: v, key: v, prompt: 'Hitta ordet', say: v.toLowerCase(), speech: 'Hitta ordet ' + v }); }
     } else if (PICTURE_CATS[cat]) {
         const pool = PICTURE_CATS[cat][1]();
-        const m = cat === 'djur' || cat === 'figurer' ? n : Math.max(2, COUNT_STEPS.filter(c => c <= pool.length && c <= n).pop() || 2);
-        values = sample(pool, m).map(([face, name]) => ({ face, key: face, prompt: T(PICTURE_CATS[cat][0]), name, say: name, speech: lang === 'ar' ? T('Hitta ').trim() + ' ' + name : T('Hitta ') + name, parts: lang === 'ar' ? [T('Hitta ').trim(), name] : [T('Hitta ') + name] }));
+        count = cat === 'djur' || cat === 'figurer' ? n : Math.max(2, COUNT_STEPS.filter(c => c <= pool.length && c <= n).pop() || 2);
+        const byFace = {}; pool.forEach(p => { byFace[p[0]] = p[1]; });
+        poolKeys = pool.map(p => p[0]);
+        byKey = face => { const name = byFace[face]; return { face, key: face, prompt: T(PICTURE_CATS[cat][0]), name, say: name, speech: lang === 'ar' ? T('Hitta ').trim() + ' ' + name : T('Hitta ') + name, parts: lang === 'ar' ? [T('Hitta ').trim(), name] : [T('Hitta ') + name] }; };
     }
-    return { values };
+    if (!poolKeys) return { values: [] };
+    const drawn = bagTake(poolKeys, count, lgetS('last', null, scope), scope);
+    if (drawn.exhausted) game.exhausted = true;
+    return { values: drawn.keys.map(byKey), targetKey: drawn.keys[0] };
 }
 
 function newRound() {
     leaveScene();
     if (game.cat === 'skriv') { newWriteRound(); return; }
     if (MATH_CATS.includes(game.cat)) { newMathRound(); return; }
-    const built = buildRound();
+    game.exhausted = false;
+    const built = buildRound(game.cat);
     if (built.error) { renderGame(built.error); return; }
     game.values = built.values;
-    const fresh = built.values.filter(v => !isRecent(game.cat, v.key));
-    game.target = pick(fresh.length ? fresh : built.values);
-    rememberKey(game.cat, game.target.key, 10);
+    game.target = game.values.find(v => v.key === built.targetKey) || pick(game.values);
+    lsetS('last', game.target.key, game.cat);
     game.locked = false;
     renderGame();
     const current = scene;
@@ -592,9 +596,11 @@ const write = { item: null, hinted: 0 };
 function newWriteRound() {
     const hard = settings.level === 'hard';
     const pool = (lang === 'ar' ? AR_WRITE_WORDS : WRITE_WORDS).filter(([, w]) => hard || (lang === 'ar' ? AR_WRITE_EASY : WRITE_EASY).has(w));
-    const freshPool = pool.filter(([, w]) => !isRecent('skriv', w));
-    const [face, answer] = pick(freshPool.length ? freshPool : pool);
-    rememberKey('skriv', answer, 14);
+    const drawn = bagTake(pool.map(p => p[1]), 1, lgetS('last', null, 'skriv'), 'skriv');
+    game.exhausted = drawn.exhausted;
+    const answer = drawn.keys[0];
+    const face = (pool.find(p => p[1] === answer) || pool[0])[0];
+    lsetS('last', answer, 'skriv');
     write.item = { mode: 'word', face, answer, lead: T('Skriv vad du ser.') };
     write.hinted = 0;
     game.locked = false;
@@ -638,6 +644,7 @@ function renderWrite() {
     if (it.mode === 'word') { const ear = el('button', 'btn secondary', '🔊'); ear.setAttribute('aria-label', T('Lyssna')); ear.onclick = () => { speakSeq([it.answer], it.answer); input.focus(); }; row.insertBefore(ear, go); }
     box.appendChild(row);
     app.appendChild(box);
+    { const ex = exhaustNote(); if (ex) app.appendChild(ex); }
     feedbackEl = el('div', 'feedback');
     app.appendChild(feedbackEl);
 
@@ -680,10 +687,36 @@ const MATH_CATS = ['plusminus', 'ganger', 'dela', 'blandat'];
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 const MATH_SYMS = ['🍎','⭐','🎈','🐟','🌸','🍪'];
+function mathSpace(cat, hard) {
+    const out = [];
+    (cat === 'blandat' ? ['plusminus', 'ganger', 'dela'] : [cat]).forEach(k => {
+        if (k === 'plusminus') {
+            const max = hard ? 20 : 10;
+            for (let a = 1; a <= max - 1; a++) for (let b = 1; b <= max - a; b++) out.push([k, '+', a, b]);
+            for (let a = 2; a <= max; a++) for (let b = 1; b <= a - 1; b++) out.push([k, '−', a, b]);
+        } else if (k === 'ganger') {
+            const bs = hard ? [1, 2, 3, 4, 5, 6, 10] : [1, 2, 3, 4, 5];
+            for (let a = 2; a <= (hard ? 6 : 4); a++) bs.forEach(b => out.push([k, '×', a, b]));
+        } else {
+            for (let a = 2; a <= (hard ? 6 : 4); a++) for (let b = 1; b <= (hard ? 6 : 5); b++) out.push([k, '÷', a * b, a]);
+        }
+    });
+    return out;
+}
 function newMathRound() {
-    let tries = 0, q;
-    do { q = makeMathQ(); tries++; } while (isRecent('math', q.speech) && tries < 25);
-    rememberKey('math', q.speech, 10);
+    const hard = settings.level === 'hard';
+    const scope = game.cat + (hard ? ':h' : ':e');
+    const space = mathSpace(game.cat, hard);
+    const keys = space.map(t => t.join(':'));
+    const drawn = bagTake(keys, 1, lgetS('last', null, scope), scope);
+    game.exhausted = drawn.exhausted;
+    const t = space[keys.indexOf(drawn.keys[0])];
+    lsetS('last', drawn.keys[0], scope);
+    const kind = t[0], a = t[2], b = t[3], sym = pick(MATH_SYMS);
+    let q;
+    if (kind === 'plusminus') q = { kind, a, b, op: t[1], ans: t[1] === '+' ? a + b : a - b, sym, speech: a + (t[1] === '+' ? ' plus ' : ' minus ') + b };
+    else if (kind === 'ganger') q = { kind, a, b, op: '×', ans: a * b, sym, speech: a + ' gånger ' + b };
+    else q = { kind, a, b, op: '÷', ans: a / b, sym, speech: a + ' delat med ' + b };
     startMathRound(q);
 }
 function makeMathQ() {
@@ -732,6 +765,7 @@ function renderMath() {
     gear.onclick = renderSettings;
     head.appendChild(gear);
     app.appendChild(head);
+    { const ex = exhaustNote(); if (ex) app.appendChild(ex); }
 
     const q = math.q;
     const box = el('div', 'write-box math-box');
@@ -878,6 +912,7 @@ function renderGame(errorMsg) {
     gear.onclick = renderSettings;
     head.appendChild(gear);
     app.appendChild(head);
+    { const ex = exhaustNote(); if (ex) app.appendChild(ex); }
 
     if (errorMsg) {
         const p = el('div', 'prompt');
@@ -1101,7 +1136,8 @@ SELMA_CATS.push(...SELMA_NEW); SELMA_ONLY.push(...SELMA_NEW);
 Object.assign(AR_UI, {
     'Para ihop': 'طابق الأزواج', 'Pussel': 'بزل', 'Ballongpop': 'فجّر البالونات', 'Klockan': 'الساعة', 'Textuppgifter': 'مسائل', 'Mönster': 'الأنماط',
     'Hitta paren': 'دوّر على الأزواج', 'Dra biten på plats': 'حط القطعة بمكانها', 'Poppa rätt ballong': 'فجّر البالونة الصحيحة',
-    'Läs och ställ klockan': 'اقرأ وظبّط الساعة', 'Flytta visarna': 'حرّك العقارب', 'Skriv tiden': 'اكتب الوقت', 'Ställ klockan': 'ظبّط الساعة', 'Vad är klockan?': 'شكد الساعة؟', 'Små räknehistorier': 'حكايات حساب صغيرة', 'Vad kommer sen?': 'شنو يجي بعدين؟', 'Ställ klockan på': 'ظبّط الساعة على', 'Lyssna och räkna': 'اسمع وعدّ'
+    'Läs och ställ klockan': 'اقرأ وظبّط الساعة', 'Flytta visarna': 'حرّك العقارب', 'Skriv tiden': 'اكتب الوقت', 'Ställ klockan': 'ظبّط الساعة', 'Vad är klockan?': 'شكد الساعة؟', 'Små räknehistorier': 'حكايات حساب صغيرة', 'Vad kommer sen?': 'شنو يجي بعدين؟', 'Ställ klockan på': 'ظبّط الساعة على', 'Lyssna och räkna': 'اسمع وعدّ',
+    'Nu har allt varit med en gång!': 'خلص كلشي مرة!', 'Byt övning': 'بدّل التمرين'
 });
 let nxLoaded = false;
 (function () {
@@ -1128,6 +1164,7 @@ function nxFrame() {
     gear.onclick = renderSettings;
     head.appendChild(gear);
     app.appendChild(head);
+    { const ex = exhaustNote(); if (ex) app.appendChild(ex); }
     const body = el('div', 'nx-body');
     app.appendChild(body);
     feedbackEl = el('div', 'feedback');
@@ -1137,6 +1174,64 @@ function nxFrame() {
 function lk(k) { return 'cs-' + k + '-' + activeProfile + '-' + game.cat; }
 function lget(k, d) { try { const v = JSON.parse(localStorage.getItem(lk(k))); return v == null ? d : v; } catch (e) { return d; } }
 function lset(k, v) { try { localStorage.setItem(lk(k), JSON.stringify(v)); } catch (e) {} }
+function lkS(k, scope) { return 'cs-' + k + '-' + activeProfile + '-' + (scope || game.cat); }
+function lgetS(k, d, scope) { try { const v = JSON.parse(localStorage.getItem(lkS(k, scope))); return v == null ? d : v; } catch (e) { return d; } }
+function lsetS(k, v, scope) { try { localStorage.setItem(lkS(k, scope), JSON.stringify(v)); } catch (e) {} }
+/* Variation: allt i poolen kommer en gång innan något återkommer. Missade kommer först när allt annat visats. */
+function bagTake(allKeys, count, avoid, scope, missFn) {
+    const inPool = new Set(allKeys);
+    const rawB = lgetS('bag', null, scope), rawM = lgetS('bagm', null, scope);
+    let bag = Array.isArray(rawB) ? rawB.filter(k => inPool.has(k)) : [];
+    let bagm = Array.isArray(rawM) ? rawM.filter(k => inPool.has(k)) : [];
+    const hadState = (Array.isArray(rawB) && rawB.length > 0) || (Array.isArray(rawM) && rawM.length > 0);
+    let silent = (rawB === null && rawM === null) || (hadState && !bag.length && !bagm.length);
+    let exhausted = false;
+    const out = [];
+    while (out.length < count) {
+        if (!bagm.length && !bag.length) {
+            if (!silent) exhausted = true;
+            silent = false;
+            const missed = (missFn ? missFn() : []).filter(k => inPool.has(k) && out.indexOf(k) === -1);
+            const rest = allKeys.filter(k => out.indexOf(k) === -1 && missed.indexOf(k) === -1);
+            bagm = sample(missed, missed.length);
+            bag = sample(rest, rest.length);
+            if (!bagm.length && !bag.length) break;
+        }
+        const arr = bagm.length ? bagm : bag;
+        let i = Math.floor(Math.random() * arr.length);
+        if (avoid != null && arr[i] === avoid && (arr.length > 1 || out.length > 0 || bag.length + bagm.length > 1)) {
+            const j = arr.findIndex(k => k !== avoid && out.indexOf(k) === -1);
+            if (j === -1) break;
+            i = j;
+        }
+        out.push(arr.splice(i, 1)[0]);
+    }
+    lsetS('bag', bag, scope); lsetS('bagm', bagm, scope);
+    return { keys: out, exhausted };
+}
+/* För stora genererade frågerum: håll reda på visade, börja om när allt setts. */
+function genPick(gen, scope) {
+    let seen = lgetS('seen', [], scope);
+    if (!Array.isArray(seen)) seen = [];
+    const S = new Set(seen);
+    let q = null, tries = 0;
+    do { q = gen(); tries++; } while (S.has(q.key) && tries < 60);
+    if (S.has(q.key)) { game.exhausted = true; seen = []; }
+    seen.push(q.key);
+    if (seen.length > 800) seen = seen.slice(-800);
+    lsetS('seen', seen, scope);
+    game.review = lget('miss', []).indexOf(q.key) !== -1;
+    return q;
+}
+function exhaustNote() {
+    if (!game.exhausted) return null;
+    const d = el('div', 'nx-exhaust');
+    d.appendChild(el('span', null, T('Nu har allt varit med en gång!')));
+    const b = el('button', 'btn secondary nx-exhaust-btn', T('Byt övning'));
+    b.onclick = () => { location.hash = '#/'; };
+    d.appendChild(b);
+    return d;
+}
 function explicitCount() {
     const d = (PROFILES[activeProfile] && PROFILES[activeProfile].defaults) || {};
     return (settings.cardCountSet || settings.cardCount !== d.cardCount) ? settings.cardCount : null;
@@ -1212,11 +1307,13 @@ function cardBtn(face, big) {
 
 /* --- Para ihop --- */
 function gPara() {
-    const L = lvl(), ec = explicitCount(), pairs = ec ? Math.max(1, Math.min(8, Math.floor(ec / 2))) : [2, 3, 4, 6][L - 1], body = nxFrame();
+    const L = lvl(), ec = explicitCount(), pairs = ec ? Math.max(1, Math.min(8, Math.floor(ec / 2))) : [2, 3, 4, 6][L - 1];
     const pool = localizeList(ANIMALS.concat(FOOD));
-    const mk = missPick(pool.map(p => p[0]));
-    let items = sample(pool, pairs);
-    if (mk && !items.some(p => p[0] === mk)) items[0] = pool.find(p => p[0] === mk);
+    const drawn = bagTake(pool.map(p => p[0]), pairs, null, 'para', () => lget('miss', []));
+    game.exhausted = drawn.exhausted;
+    const byFace = {}; pool.forEach(p => { byFace[p[0]] = p[1]; });
+    const items = drawn.keys.map(f => [f, byFace[f]]);
+    const body = nxFrame();
     const deck = sample(items.concat(items), pairs * 2);
     const grid = el('div', 'nx-grid');
     grid.style.gridTemplateColumns = 'repeat(' + (pairs <= 2 ? 2 : pairs === 3 ? 3 : 4) + ',1fr)';
@@ -1246,11 +1343,13 @@ function gPara() {
 
 /* --- Pussel --- */
 function gPussel() {
-    const L = lvl(), [cols, rows] = settings.pussPieces ? ({ 2: [2, 1], 3: [3, 1], 4: [2, 2], 6: [3, 2], 8: [4, 2], 9: [3, 3], 12: [4, 3] })[settings.pussPieces] : [[3, 1], [2, 2], [3, 2], [2, 3]][L - 1], body = nxFrame(), n = cols * rows;
+    const L = lvl(), [cols, rows] = settings.pussPieces ? ({ 2: [2, 1], 3: [3, 1], 4: [2, 2], 6: [3, 2], 8: [4, 2], 9: [3, 3], 12: [4, 3] })[settings.pussPieces] : [[3, 1], [2, 2], [3, 2], [2, 3]][L - 1], n = cols * rows;
     const pool = localizeList(ANIMALS.concat(FOOD));
-    const mk = missPick(pool.map(p => p[0]));
-    const [face, name] = mk ? pool.find(p => p[0] === mk) : pick(pool);
+    const drawn = bagTake(pool.map(p => p[0]), 1, game.lastKey, 'pussel', () => lget('miss', []));
+    game.exhausted = drawn.exhausted;
+    const [face, name] = pool.find(p => p[0] === drawn.keys[0]);
     game.lastKey = face;
+    const body = nxFrame();
     const S = Math.min(230, Math.floor(Math.min(innerWidth, 520) - 60)), pw = S / cols, ph = S / rows;
     const trayRows = Math.ceil(n / cols), trayTop = S + 18;
     const stage = el('div', 'nx-stage'); stage.style.width = S + 'px'; stage.style.height = (trayTop + trayRows * (ph + 8)) + 'px';
@@ -1285,17 +1384,17 @@ function gPussel() {
 
 /* --- Ballongpop --- */
 function gBallong() {
-    const L = lvl(), ec = explicitCount(), n = ec ? Math.max(3, Math.min(8, ec)) : [3, 4, 5, 5][L - 1], body = nxFrame();
+    const L = lvl(), ec = explicitCount(), n = ec ? Math.max(3, Math.min(8, ec)) : [3, 4, 5, 5][L - 1];
     const useFig = game.round % 2 === 0;
     const sv = [game.cat, settings.cardCount, settings.minRange, settings.maxRange];
     let built;
-    try { game.cat = useFig ? 'figurer' : 'siffror'; settings.cardCount = n; settings.minRange = 1; settings.maxRange = Math.max([5, 10, 20, 30][L - 1], n * 2); built = buildRound(); }
+    try { game.cat = useFig ? 'figurer' : 'siffror'; settings.cardCount = n; settings.minRange = 1; settings.maxRange = Math.max([5, 10, 20, 30][L - 1], n * 2); built = buildRound('ballong' + (useFig ? ':fig' : ':sif')); }
     finally { game.cat = sv[0]; settings.cardCount = sv[1]; settings.minRange = sv[2]; settings.maxRange = sv[3]; }
     const vals = built.values || [];
-    const mk = missPick(vals.map(v => v.key));
-    const target = (mk && vals.find(v => v.key === mk)) || pick(vals);
-    game.review = !!(mk && vals.find(v => v.key === mk));
+    const target = vals.find(v => v.key === built.targetKey) || pick(vals);
+    game.review = lgetS('miss', [], 'ballong').indexOf(target.key) !== -1;
     game.lastKey = target.key; game.target = target; game.locked = false;
+    const body = nxFrame();
     body.appendChild(promptBar(target.prompt + ':', target.name || target.face, () => sayT(target)));
     const sky = el('div', 'nx-sky'); body.appendChild(sky);
     const colors = ['#ef5b5b', '#4a90e2', '#43b581', '#f5a623', '#a259d9', '#f06fa8'];
@@ -1346,10 +1445,17 @@ function timeParts(h, m) {
 function digital(h, m) { return h + ':' + (m < 10 ? '0' : '') + m; }
 function angDiff(a, b) { const d = Math.abs(((a - b) % 360 + 540) % 360 - 180); return d; }
 function gKlockan() {
-    const L = Math.min(3, lvl()), body = nxFrame();
+    const L = Math.min(3, lvl());
     const mode = 'set';
-    const q = nextQ(() => { const ms = [[0], [0, 30], [0, 15, 30, 45]][L - 1]; const h = 1 + rn(12), m = pick(ms); return { mode, h, m, key: mode + ':' + h + ':' + m }; });
+    const msL = [[0], [0, 30], [0, 15, 30, 45]][L - 1], keysL = [];
+    msL.forEach(mm => { for (let hh = 1; hh <= 12; hh++) keysL.push(mode + ':' + hh + ':' + mm); });
+    const drawn = bagTake(keysL, 1, game.lastKey, 'klockan:L' + L, () => lget('miss', []));
+    game.exhausted = drawn.exhausted;
+    const kp = drawn.keys[0].split(':');
+    const q = { mode, h: +kp[1], m: +kp[2], key: drawn.keys[0] };
+    game.review = lget('miss', []).indexOf(q.key) !== -1;
     game.lastKey = q.key; const { h, m } = q;
+    const body = nxFrame();
     const parts = timeParts(h, m), fb = parts.join(' ');
     const hA = (h % 12) * 30 + m * 0.5, mA = m * 6;
     if (q.mode === 'read') {
@@ -1398,9 +1504,16 @@ function gKlockan() {
 }
 
 function gKlockan2() {
-    const L = Math.min(3, lvl()), body = nxFrame(); body.classList.add('nx-k2');
-    const q = nextQ(() => { const ms = [[0], [0, 30], [0, 15, 30, 45]][L - 1]; const h = 1 + rn(12), m = pick(ms); return { h, m, key: 'in:' + h + ':' + m }; });
+    const L = Math.min(3, lvl());
+    const msL = [[0], [0, 30], [0, 15, 30, 45]][L - 1], keysL = [];
+    msL.forEach(mm => { for (let hh = 1; hh <= 12; hh++) keysL.push('in:' + hh + ':' + mm); });
+    const drawn = bagTake(keysL, 1, game.lastKey, 'klockan2:L' + L, () => lget('miss', []));
+    game.exhausted = drawn.exhausted;
+    const kp = drawn.keys[0].split(':');
+    const q = { h: +kp[1], m: +kp[2], key: drawn.keys[0] };
+    game.review = lget('miss', []).indexOf(q.key) !== -1;
     game.lastKey = q.key; const { h, m } = q; game.locked = false;
+    const body = nxFrame(); body.classList.add('nx-k2');
     const parts = timeParts(h, m), fb = parts.join(' ');
     body.appendChild(promptBar(TT('Vad är klockan?'), '', () => sayParts([TT('Vad är klockan?')])));
     body.appendChild(clockSvg((h % 12) * 30 + m * 0.5, m * 6));
@@ -1435,14 +1548,15 @@ function gKlockan2() {
 
 /* --- Textuppgifter --- */
 function gText() {
-    const L = lvl(), body = nxFrame();
-    const q = nextQ(() => {
+    const L = lvl();
+    const q = genPick(() => {
         const sub = L >= 3 && (L === 3 || Math.random() < 0.5); let a, b, g = 0;
         if (!sub) { const max = [6, 8, 12, 12][L - 1]; do { a = 2 + rn(max - 3); b = 2 + rn(max - 3); } while (a + b > max && g++ < 100); if (a + b > max) { a = 2; b = 2; } }
         else { a = 4 + rn(9); b = 2 + rn(a - 3); }
         const o = rn(NXOBJ.length);
         return { a, b, sub, o, key: a + (sub ? '-' : '+') + b + ':' + o };
-    });
+    }, 'text:L' + L);
+    const body = nxFrame();
     game.lastKey = q.key;
     const { a, b, sub, o } = q, ans = sub ? a - b : a + b, ob = NXOBJ[o], objName = lang === 'ar' ? ob[2] : ob[1];
     let parts, line;
@@ -1476,8 +1590,8 @@ function gText() {
 
 /* --- Mönster --- */
 function gMonster() {
-    const L = lvl(), body = nxFrame();
-    const q = nextQ(() => {
+    const L = lvl();
+    const q = genPick(() => {
         if (L < 4) {
             const t = sample(NXTOK, L === 3 ? 3 : 2); const shape = L === 1 ? [0, 1, 0, 1, 0, 1] : L === 2 ? (Math.random() < 0.5 ? [0, 0, 1, 0, 0, 1] : [0, 1, 1, 0, 1, 1]) : [0, 1, 2, 0, 1, 2];
             const full = shape.map(i => t[i]);
@@ -1485,7 +1599,8 @@ function gMonster() {
         }
         const step = pick([2, 3, 5, 10]), start = 1 + rn(10), seq = [0, 1, 2, 3, 4].map(i => start + i * step);
         return { kind: 'num', shown: seq.slice(0, 4), ans: seq[4], step, key: 'n' + start + ':' + step };
-    });
+    }, 'monster:L' + L);
+    const body = nxFrame();
     game.lastKey = q.key;
     body.appendChild(promptBar(TT('Vad kommer sen?'), '', () => sayParts([TT('Vad kommer sen?')])));
     const seq = el('div', 'nx-seq');
@@ -1544,13 +1659,15 @@ function kSvg(scene) {
   return svg;
 }
 function gKroppen() {
-  const L = lvl(), body = nxFrame(); body.classList.add('nx-k2');
+  const L = lvl();
   const names = {}; localizeList(BODY).forEach(([f, n]) => { names[f] = n; });
   const scene = L >= 3 && game.round % 2 === 0 ? 'body' : 'face';
   const parts = scene === 'body' ? KBODY : (L === 1 ? KFACE.slice(0, 4) : KFACE);
-  const mk = missPick(parts.map(p => p[0]));
-  const target = mk ? parts.find(p => p[0] === mk) : pick(parts.filter(p => p[0] !== game.lastKey));
-  game.review = !!mk; game.lastKey = target[0]; game.locked = false;
+  const drawn = bagTake(parts.map(p => p[0]), 1, game.lastKey, 'kroppen:' + scene + ':' + parts.length, () => lget('miss', []));
+  game.exhausted = drawn.exhausted;
+  const target = parts.find(p => p[0] === drawn.keys[0]);
+  game.review = lget('miss', []).indexOf(target[0]) !== -1; game.lastKey = target[0]; game.locked = false;
+  const body = nxFrame(); body.classList.add('nx-k2');
   const nm = names[target[0]];
   const sp = lang === 'ar' ? { parts: [T('Hitta ').trim(), nm], speech: T('Hitta ').trim() + ' ' + nm } : { parts: [T('Hitta ') + nm], speech: T('Hitta ') + nm };
   body.appendChild(promptBar(T('Peka på') + ':', nm, () => sayT(sp)));
@@ -1578,11 +1695,11 @@ function gKroppen() {
 const NXGAMES = { kroppen: gKroppen, para: gPara, pussel: gPussel, ballong: gBallong, klockan: gKlockan, klockan2: gKlockan2, text: gText, monster: gMonster };
 const _nxStart = startGame, _nxNew = newRound;
 startGame = function (cat) {
-    if (NXGAMES[cat]) { game.cat = cat; game.round = 1; game.stars = 0; game.good = 0; game.bad = 0; game.lastKey = null; game.review = false; newRound(); }
+    if (NXGAMES[cat]) { game.cat = cat; game.round = 1; game.stars = 0; game.good = 0; game.bad = 0; game.lastKey = null; game.review = false; game.exhausted = false; newRound(); }
     else _nxStart(cat);
 };
 newRound = function () {
-    if (NXGAMES[game.cat]) { leaveScene(); game.locked = false; NXGAMES[game.cat](); }
+    if (NXGAMES[game.cat]) { leaveScene(); game.locked = false; game.exhausted = false; NXGAMES[game.cat](); }
     else _nxNew();
 };
 if (CATEGORIES[location.hash.replace(/^#\/?/, '')] && NXGAMES[location.hash.replace(/^#\/?/, '')]) route();
