@@ -506,10 +506,12 @@ function buildRound(scope) {
     const mk = (face, key, prompt, name, say, parts) => ({ face, key, prompt, name, say, parts, speech: parts.join(' ') });
     let poolKeys = null, byKey = null, count = n;
     if (cat === 'siffror') {
-        const min = settings.minRange, max = settings.maxRange;
-        if (isNaN(min) || isNaN(max) || min >= max || (max - min + 1) < n) {
-            return { error: T('Välj ett större talområde: minst måste vara lägre än högst, och området måste rymma alla kort.') };
-        }
+        let min = parseInt(settings.minRange), max = parseInt(settings.maxRange);
+        const dd = (PROFILES[activeProfile] && PROFILES[activeProfile].defaults) || {};
+        if (isNaN(min) || min < 0) min = dd.minRange != null ? dd.minRange : 1;
+        if (isNaN(max)) max = dd.maxRange != null ? dd.maxRange : 20;
+        if (min >= max) { const t = min; min = Math.min(t, max); max = Math.max(t, max, min + n); }
+        if ((max - min + 1) < n) max = min + n - 1;
         const pool = [];
         for (let i = min; i <= max; i++) pool.push(String(i));
         poolKeys = pool;
