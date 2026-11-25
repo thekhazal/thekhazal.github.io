@@ -42,6 +42,7 @@ const AR_UI = {
     '🗣️ Läs upp': '🗣️ القراءة بصوت عالي', '🖼️ Visa ledtråd': '🖼️ إظهار التلميح',
     '🌱 Nivå': '🌱 المستوى', 'Lugn': 'هادئ', 'Klurig': 'صعب شوية',
     '🃏 Antal kort': '🃏 عدد البطاقات', '🧩 Antal delar': '🧩 عدد القطع', 'Automatisk': 'تلقائي', '🔢 Talområde': '🔢 مدى الأرقام',
+    'Området har bara': 'المدى فيه بس', 'tal, så': 'أرقام، يعني', 'kort visas.': 'بطاقات رح تطلع.', 'Minst måste vara lägre än högst. Området är oförändrat.': 'الأدنى لازم يكون أقل من الأعلى. المدى ما تغيّر.',
     'Minst': 'الأدنى', 'Högst': 'الأعلى', '🌐 Språk': '🌐 اللغة',
     'Välj ett större talområde: minst måste vara lägre än högst, och området måste rymma alla kort.': 'اختار مدى أكبر للأرقام: الأدنى لازم يكون أقل من الأعلى، والمدى لازم يسع كل البطاقات.',
     'Selma': 'سلمى', 'Celia': 'سيليا',
@@ -500,18 +501,22 @@ function rememberKey(cat, key, keep) {
 }
 function isRecent(cat, key) { return (recentKeys[cat] || []).includes(key); }
 
+function fixRange() {
+    const dd = (PROFILES[activeProfile] && PROFILES[activeProfile].defaults) || {};
+    let min = parseInt(settings.minRange), max = parseInt(settings.maxRange), fixed = false;
+    if (isNaN(min) || isNaN(max) || min < 0 || min >= max) { min = dd.minRange != null ? dd.minRange : 1; max = dd.maxRange != null ? dd.maxRange : 20; fixed = true; }
+    if (fixed) { settings.minRange = min; settings.maxRange = max; saveSettings(); }
+    return { min, max, fixed, size: max - min + 1 };
+}
 function buildRound(scope) {
     const cat = game.cat;
     const n = settings.cardCount;
     const mk = (face, key, prompt, name, say, parts) => ({ face, key, prompt, name, say, parts, speech: parts.join(' ') });
     let poolKeys = null, byKey = null, count = n;
     if (cat === 'siffror') {
-        let min = parseInt(settings.minRange), max = parseInt(settings.maxRange);
-        const dd = (PROFILES[activeProfile] && PROFILES[activeProfile].defaults) || {};
-        if (isNaN(min) || min < 0) min = dd.minRange != null ? dd.minRange : 1;
-        if (isNaN(max)) max = dd.maxRange != null ? dd.maxRange : 20;
-        if (min >= max) { const t = min; min = Math.min(t, max); max = Math.max(t, max, min + n); }
-        if ((max - min + 1) < n) max = min + n - 1;
+        const ri = fixRange();
+        const min = ri.min, max = ri.max;
+        if ((max - min + 1) < n) count = Math.max(2, max - min + 1);
         const pool = [];
         for (let i = min; i <= max; i++) pool.push(String(i));
         poolKeys = pool;
@@ -530,9 +535,13 @@ function buildRound(scope) {
         byKey = face => { const name = byFace[face]; return { face, key: face, prompt: T(PICTURE_CATS[cat][0]), name, say: name, speech: lang === 'ar' ? T('Hitta ').trim() + ' ' + name : T('Hitta ') + name, parts: lang === 'ar' ? [T('Hitta ').trim(), name] : [T('Hitta ') + name] }; };
     }
     if (!poolKeys) return { values: [] };
-    const drawn = bagTake(poolKeys, count, lgetS('last', null, scope), scope);
+    const drawn = bagTake(poolKeys, 1, lgetS('last', null, scope), scope);
     if (drawn.exhausted) game.exhausted = true;
-    return { values: drawn.keys.map(byKey), targetKey: drawn.keys[0] };
+    const target = drawn.keys[0];
+    const others = poolKeys.filter(k => k !== target);
+    for (let i = others.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = others[i]; others[i] = others[j]; others[j] = t; }
+    const keys = [target].concat(others.slice(0, Math.max(0, count - 1)));
+    return { values: keys.map(byKey), targetKey: target };
 }
 
 function newRound() {
@@ -1038,6 +1047,7 @@ function renderSettings() {
     sheet.appendChild(ccRow);
 
     if (game.cat === 'siffror') {
+        fixRange();
         const rRow = el('div', 'settings-row');
         rRow.appendChild(el('span', null, T('🔢 Talområde')));
         const pair = el('div', 'range-pair');
@@ -1045,11 +1055,26 @@ function renderSettings() {
         mn.type = 'number'; mn.value = settings.minRange; mn.min = 0; mn.setAttribute('aria-label', T('Minst'));
         const mx = document.createElement('input');
         mx.type = 'number'; mx.value = settings.maxRange; mx.min = 1; mx.setAttribute('aria-label', T('Högst'));
-        mn.onchange = () => { settings.minRange = parseInt(mn.value); saveSettings(); };
-        mx.onchange = () => { settings.maxRange = parseInt(mx.value); saveSettings(); };
+        const note = el('div', 'settings-note', '');
+        note.style.cssText = 'font-size:13px;opacity:.75;margin:4px 0 0;width:100%';
+        const refreshNote = () => {
+            const sz = settings.maxRange - settings.minRange + 1;
+            note.textContent = sz < settings.cardCount ? T('Området har bara') + ' ' + sz + ' ' + T('tal, så') + ' ' + Math.max(2, sz) + ' ' + T('kort visas.') : '';
+        };
+        const applyRange = () => {
+            const a = parseInt(mn.value), b = parseInt(mx.value);
+            if (isNaN(a) || isNaN(b) || a < 0 || a >= b) {
+                mn.value = settings.minRange; mx.value = settings.maxRange;
+                note.textContent = T('Minst måste vara lägre än högst. Området är oförändrat.');
+                return;
+            }
+            settings.minRange = a; settings.maxRange = b; saveSettings(); refreshNote();
+        };
+        mn.onchange = applyRange; mx.onchange = applyRange;
         pair.appendChild(mn); pair.appendChild(mx);
         rRow.appendChild(pair);
         sheet.appendChild(rRow);
+        sheet.appendChild(note); refreshNote();
     }
 
     const row = el('div', 'btn-row');
