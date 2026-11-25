@@ -253,9 +253,9 @@ function saveSettings() {
 /* ---------- ljud och tal ---------- */
 const voiceAudio = new Audio();
 let audioMap = {};
-const clipLoads = [fetch('5-speech-audio.json?v=3').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {})];
-for (let i = 1; i <= 2; i++) clipLoads.push(fetch('sp2-' + i + '.json?v=9').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {}));
-for (let i = 3; i <= 12; i++) clipLoads.push(new Promise(res => { const sc = document.createElement('script'); sc.src = (i === 12 ? '3-sp-12' : 'sp3-' + i) + '.js?v=10'; sc.onload = () => { Object.assign(audioMap, window.__clips || {}); res(); }; sc.onerror = () => res(); document.head.appendChild(sc); }));
+const clipLoads = ['sa-01.json', 'sa-02.json', 'sa-03.json', 'sa-04.json', 'sa-05.json', 'sa-06.json', 'sa-07.json', 'sa-08.json', 'sa-09.json', 'sa-10.json', 'sa-11.json', 'sa-12.json', 'sa-13.json', 'sa-14.json', 'sa-15.json', 'sa-16.json', 'sa-17.json', 'sa-18.json', 'sa-19.json', 'sa-20.json', 'sa-21.json', 'sa-22.json', 'sa-23.json', 'sa-24.json', 'sa-25.json', 'sa-26.json', 'sa-27.json', 'sa-28.json', 'sa-29.json', 'sa-30.json'].map(u => fetch(u + '?v=7').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {}));
+for (let i = 1; i <= 2; i++) clipLoads.push(fetch('sp2-' + i + '.json?v=10').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {}));
+['sp3-3', 'sp3-4', 'sp3-5', 'sp3-6', 'sp3-7', 'sp3-8', 'sp3-9', 'sp3-10', 'sp3-11', 'sp3-12a', 'sp3-12b', 'sp3-12c', 'sp3-12d', 'sp3-12e'].forEach(nm => clipLoads.push(new Promise(res => { const sc = document.createElement('script'); sc.src = nm + '.js?v=12'; sc.onload = () => { Object.assign(audioMap, window.__clips || {}); res(); }; sc.onerror = () => res(); document.head.appendChild(sc); })));
 let arClipsRequested = false;
 let audioBooted = false;
 function loadArClips() {
@@ -706,10 +706,9 @@ function mathSpace(cat, hard) {
             for (let a = 1; a <= max - 1; a++) for (let b = 1; b <= max - a; b++) out.push([k, '+', a, b]);
             for (let a = 2; a <= max; a++) for (let b = 1; b <= a - 1; b++) out.push([k, '−', a, b]);
         } else if (k === 'ganger') {
-            const bs = hard ? [1, 2, 3, 4, 5, 6, 10] : [1, 2, 3, 4, 5];
-            for (let a = 2; a <= (hard ? 6 : 4); a++) bs.forEach(b => out.push([k, '×', a, b]));
+            for (let a = 2; a <= 5; a++) for (let b = 1; b <= (hard ? 10 : 6); b++) out.push([k, '×', a, b]);
         } else {
-            for (let a = 2; a <= (hard ? 6 : 4); a++) for (let b = 1; b <= (hard ? 6 : 5); b++) out.push([k, '÷', a * b, a]);
+            for (let a = 2; a <= (hard ? 6 : 5); a++) for (let b = 1; b <= 6; b++) out.push([k, '÷', a * b, a]);
         }
     });
     return out;
@@ -1169,7 +1168,7 @@ Object.assign(AR_UI, {
 });
 let nxLoaded = false;
 (function () {
-    const p = new Promise(res => { const sc = document.createElement('script'); sc.src = 'nx-clips.js?v=1'; sc.onload = () => { Object.assign(audioMap, window.__arclips || {}); nxLoaded = true; res(); }; sc.onerror = () => res(); document.head.appendChild(sc); });
+    const p = Promise.all(['nx-1.js', 'nx-2.js', 'nx-3.js', 'nx-4.js', 'nx-5.js', 'nx-6.js'].map(n => n + '?v=4').map(u => new Promise(res => { const sc = document.createElement('script'); sc.src = u; sc.onload = () => { Object.assign(audioMap, window.__arclips || {}); res(); }; sc.onerror = () => res(); document.head.appendChild(sc); }))).then(() => { nxLoaded = true; });
     clipsLoaded = false; audioReady = Promise.all([audioReady, p]); audioReady.then(() => { clipsLoaded = true; });
     const st = document.createElement('style');
     st.textContent = '.nx-grid{display:grid;gap:12px;margin:12px 0}.nx-card .nx-back{font-size:clamp(34px,10vw,54px)}.nx-card.open{background:#fff8e1;color:#2d2a32}.nx-card.correct,.nx-card.correct.open{background:#d9f3e0;color:#2d2a32}.nx-stage{position:relative;margin:12px auto;touch-action:none}.nx-board{position:absolute;left:0;top:0;border-radius:18px;background:#fff;box-shadow:var(--shadow)}.nx-slot{position:absolute;overflow:hidden;box-sizing:border-box;border:2px dashed #c9c2d6}.nx-slot .nx-ph{opacity:.16;filter:grayscale(1)}.nx-piece{position:absolute;overflow:hidden;border-radius:10px;background:#fff;box-shadow:0 4px 12px rgba(45,42,50,.25);touch-action:none;cursor:grab;box-sizing:border-box}.nx-piece.placed{box-shadow:none;border-radius:0;cursor:default}.nx-sky{position:relative;height:340px;overflow:hidden;margin-top:8px}.nx-balloon{position:absolute;bottom:20px;width:84px;height:104px;border:0;border-radius:50% 50% 48% 48%;font-size:34px;font-weight:800;color:#fff;box-shadow:inset -8px -8px 0 rgba(0,0,0,.12),var(--shadow);animation:nxbob 2.6s ease-in-out infinite;transition:transform 1.1s ease-in,opacity 1.1s ease-in,bottom 1.1s ease-in}.nx-balloon:after{content:"";position:absolute;left:50%;top:100%;width:2px;height:60px;background:#8a8494}.nx-balloon.pop{transform:scale(1.6);opacity:0;transition:transform .3s,opacity .3s}.nx-balloon.away{bottom:420px;opacity:0;animation:none}@keyframes nxbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}.nx-clock,.nx-clock *,.nx-stage,.nx-stage *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.nx-clock{display:block;margin:10px auto;width:min(78vw,300px);height:auto;touch-action:none}.nx-digital{font-size:44px;font-weight:800;text-align:center}.nx-story{background:#fff;border-radius:18px;padding:14px;margin:10px 0;box-shadow:var(--shadow);font-size:20px;font-weight:700;line-height:1.5}.nx-icons{font-size:26px;line-height:1.3;margin-top:6px;word-break:break-all}.nx-seq{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;font-size:40px;margin:14px 0;background:#fff;border-radius:18px;padding:12px;box-shadow:var(--shadow)}.nx-seq .q{border:3px dashed #c9c2d6;border-radius:12px;min-width:52px;text-align:center}.nx-review{display:inline-block;margin-left:8px}.nx-k2 .prompt{padding:8px 14px;min-height:0;margin:4px 0}.nx-k2 .prompt .lead{font-size:16px}.nx-k2 .nx-clock{width:min(44vw,170px);margin:4px auto}.nx-k2 .nx-timein{margin:2px 0;font-size:36px}.nx-k2 .nx-tf{height:52px;min-width:72px}.nx-k2 .nx-pad{gap:6px;margin:6px auto}.nx-k2 .nx-key{height:46px;font-size:24px}.nx-timein{display:flex;align-items:center;justify-content:center;gap:8px;font-size:44px;font-weight:800;margin:6px 0}.nx-tf{min-width:84px;height:68px;border:3px solid #c9c2d6;border-radius:16px;background:#fff;font:inherit;color:#2d2a32}.nx-tf.on{border-color:#f5a623;box-shadow:0 0 0 3px rgba(245,166,35,.3)}.nx-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px auto;max-width:300px}.nx-key{height:58px;border:0;border-radius:14px;background:#fff;box-shadow:var(--shadow);font:inherit;font-size:28px;font-weight:800;color:#2d2a32}.nx-key.ok{background:#43b581;color:#fff}.nx-kropp{display:block;margin:6px auto;width:min(88vw,330px);height:auto;touch-action:manipulation;-webkit-user-select:none;user-select:none}.nx-kropp .kz{cursor:pointer;-webkit-tap-highlight-color:transparent}.nx-kropp.shake{animation:kshake .35s}@keyframes kshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}';
@@ -1214,6 +1213,8 @@ function bagTake(allKeys, count, avoid, scope, missFn) {
     const inPool = new Set(allKeys);
     let stored = lgetS('shown', [], scope);
     if (!Array.isArray(stored)) stored = [];
+    let tail = lgetS('tail', [], scope); if (!Array.isArray(tail)) tail = [];
+    const tailN = Math.min(5, Math.floor(allKeys.length / 3));
     const stale = stored.filter(k => !inPool.has(k));
     const shownSet = new Set(stored.filter(k => inPool.has(k)));
     let exhausted = false;
@@ -1232,6 +1233,7 @@ function bagTake(allKeys, count, avoid, scope, missFn) {
             unseen = allKeys.filter(k => out.indexOf(k) === -1);
             if (!unseen.length) break;
         }
+        if (tailN > 0 && unseen.length > tailN) { const rest = unseen.filter(k => tail.slice(-tailN).indexOf(k) === -1); if (rest.length) unseen = rest; }
         const missed = missFn ? missFn().filter(k => unseen.indexOf(k) !== -1) : [];
         let key = null;
         if (missed.length) {
@@ -1240,9 +1242,10 @@ function bagTake(allKeys, count, avoid, scope, missFn) {
         } else key = drawOne(unseen, avoid);
         if (key == null) break;
         out.push(key);
-        shownSet.add(key);
+        shownSet.add(key); tail.push(key);
     }
     lsetS('shown', [...shownSet].concat(stale).slice(-300), scope);
+    lsetS('tail', tail.slice(-8), scope);
     return { keys: out, exhausted };
 }
 
@@ -1700,8 +1703,8 @@ function kSvg(scene) {
 function gKroppen() {
   const L = lvl();
   const names = {}; localizeList(BODY).forEach(([f, n]) => { names[f] = n; });
-  const scene = L >= 3 && game.round % 2 === 0 ? 'body' : 'face';
-  const parts = scene === 'body' ? KBODY : (L === 1 ? KFACE.slice(0, 4) : KFACE);
+  const scene = game.round % 2 === 0 ? 'body' : 'face';
+  const parts = scene === 'body' ? KBODY : KFACE;
   const drawn = bagTake(parts.map(p => p[0]), 1, game.lastKey, 'kroppen', () => lget('miss', []));
   game.exhausted = drawn.exhausted;
   const target = parts.find(p => p[0] === drawn.keys[0]);
