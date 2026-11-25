@@ -1042,7 +1042,7 @@ function renderSettings() {
         o.value = n; o.textContent = n; if (settings.cardCount === n) o.selected = true;
         cc.appendChild(o);
     });
-    cc.onchange = () => { settings.cardCount = parseInt(cc.value); settings.cardCountSet = true; saveSettings(); };
+    cc.onchange = () => { settings.cardCount = parseInt(cc.value); settings.cardCountSet = true; saveSettings(); if (window.__rangeNote) window.__rangeNote(); };
     ccRow.appendChild(cc);
     sheet.appendChild(ccRow);
 
@@ -1074,12 +1074,13 @@ function renderSettings() {
         pair.appendChild(mn); pair.appendChild(mx);
         rRow.appendChild(pair);
         sheet.appendChild(rRow);
-        sheet.appendChild(note); refreshNote();
+        sheet.appendChild(note); refreshNote(); window.__rangeNote = refreshNote;
     }
 
     const row = el('div', 'btn-row');
     const close = el('button', 'btn', T('Klart'));
     close.onclick = () => {
+        window.__rangeNote = null;
         overlay.remove();
         if (game.cat) newRound();
     };
