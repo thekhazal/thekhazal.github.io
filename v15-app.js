@@ -376,11 +376,14 @@ function waCtx() { if (!actx) { try { const C = window.AudioContext || window.we
 function waTrim(k) {
     if (waBuf[k]) return waBuf[k];
     return waBuf[k] = fetch(audioMap[k]).then(r => r.arrayBuffer()).then(ab => new Promise((res, rej) => { const p = actx.decodeAudioData(ab, res, rej); if (p && p.catch) p.catch(rej); })).then(buf => {
-        const d = buf.getChannelData(0), th = 0.01; let a = 0, e = d.length - 1;
+        const d = buf.getChannelData(0); let pk = 0;
+        for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > pk) pk = v; }
+        const th = Math.max(0.0005, pk * 0.008);   // about -42 dB under this clip's own peak
+        let a = 0, e = d.length - 1;
         while (a < e && Math.abs(d[a]) < th) a++;
         while (e > a && Math.abs(d[e]) < th) e--;
-        const pad = Math.floor(buf.sampleRate * 0.012);
-        a = Math.max(0, a - pad); e = Math.min(d.length - 1, e + pad * 2);
+        a = Math.max(0, a - Math.floor(buf.sampleRate * 0.03)); e = Math.min(d.length - 1, e + Math.floor(buf.sampleRate * 0.08));
+        if (pk < 0.0005 || (e - a) / buf.sampleRate < 0.12) { a = 0; e = d.length - 1; }   // never cut a near-silent or very short clip
         return { buf, s: a / buf.sampleRate, d: (e - a) / buf.sampleRate, full: buf.duration };
     });
 }
