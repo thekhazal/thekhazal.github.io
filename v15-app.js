@@ -21,7 +21,7 @@ const AR_UI = {
     'Djur': 'الحيوانات', 'Hitta djuret': 'دوّر على الحيوان',
     'Mat': 'الأكل', 'Hitta maten': 'دوّر على الأكل',
     'Saker': 'أغراض', 'Bilar, bollar och mer': 'سيارات وكرات وأكثر',
-    'Kroppen': 'الجسم', 'Hitta på kroppen': 'دوّر على جزء من الجسم',
+    'Kroppen': 'الجسم', 'Peka på': 'أشّر على', 'Hitta på kroppen': 'دوّر على جزء من الجسم',
     'Skriv': 'اكتب', 'Skriv orden': 'اكتب الكلمات',
     'Plus och minus': 'جمع وطرح', 'Räkna med knappar': 'احسب بالأزرار',
     'Gånger': 'الضرب', 'Grupper med saker': 'مجموعات من الأشياء',
@@ -41,7 +41,7 @@ const AR_UI = {
     '🔊 Volym': '🔊 الصوت', '🎵 Bakgrundsmusik': '🎵 موسيقى الخلفية',
     '🗣️ Läs upp': '🗣️ القراءة بصوت عالي', '🖼️ Visa ledtråd': '🖼️ إظهار التلميح',
     '🌱 Nivå': '🌱 المستوى', 'Lugn': 'هادئ', 'Klurig': 'صعب شوية',
-    '🃏 Antal kort': '🃏 عدد البطاقات', '🔢 Talområde': '🔢 مدى الأرقام',
+    '🃏 Antal kort': '🃏 عدد البطاقات', '🧩 Antal delar': '🧩 عدد القطع', 'Automatisk': 'تلقائي', '🔢 Talområde': '🔢 مدى الأرقام',
     'Minst': 'الأدنى', 'Högst': 'الأعلى', '🌐 Språk': '🌐 اللغة',
     'Välj ett större talområde: minst måste vara lägre än högst, och området måste rymma alla kort.': 'اختار مدى أكبر للأرقام: الأدنى لازم يكون أقل من الأعلى، والمدى لازم يسع كل البطاقات.',
     'Selma': 'سلمى', 'Celia': 'سيليا',
@@ -292,6 +292,7 @@ function applyMusic() {
 }
 function stopSpeech() {
     speechToken++;
+    waStop();
     voiceAudio.pause();
     voiceAudio.onended = voiceAudio.onerror = null;
     try { if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); lastCancelAt = Date.now(); } } catch (e) {}
@@ -324,6 +325,7 @@ function speak(text) {
     if (!clipsLoaded) { const t0 = speechToken; return audioReady.then(() => { if (t0 === speechToken) return speak(text); }); }
     stopSpeech();
     if (!settings.speech || settings.volume === 0) return Promise.resolve();
+    if (audioMap[text]) { const c = waCtx(); if (c && c.state === 'running' && !c._broken) return waSeq([text], text); }
     const token = speechToken;
     talking = true; applyMusic();
     return new Promise(resolve => {
@@ -366,7 +368,44 @@ function speak(text) {
     });
 }
 function sayTarget(t) { return lang === 'ar' ? speakSeq(t.parts, t.speech) : speak(t.speech); }
-function speakSeq(parts, fallbackText) {
+
+/* ---------- sammanhängande uppläsning (trimmade ljudbitar, WebAudio) ---------- */
+let actx = null, waSrc = [], waBuf = {}, waLog = [];
+function waCtx() { if (!actx) { try { const C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); } catch (e) {} } return actx; }
+['pointerdown', 'touchstart', 'click', 'keydown'].forEach(n => document.addEventListener(n, () => { const c = waCtx(); if (c && c.state !== 'running') c.resume().catch(() => {}); }, { passive: true, capture: true }));
+function waTrim(k) {
+    if (waBuf[k]) return waBuf[k];
+    return waBuf[k] = fetch(audioMap[k]).then(r => r.arrayBuffer()).then(ab => new Promise((res, rej) => { const p = actx.decodeAudioData(ab, res, rej); if (p && p.catch) p.catch(rej); })).then(buf => {
+        const d = buf.getChannelData(0), th = 0.01; let a = 0, e = d.length - 1;
+        while (a < e && Math.abs(d[a]) < th) a++;
+        while (e > a && Math.abs(d[e]) < th) e--;
+        const pad = Math.floor(buf.sampleRate * 0.012);
+        a = Math.max(0, a - pad); e = Math.min(d.length - 1, e + pad * 2);
+        return { buf, s: a / buf.sampleRate, d: (e - a) / buf.sampleRate, full: buf.duration };
+    });
+}
+function waStop() { waSrc.forEach(x => { try { x.onended = null; x.stop(); } catch (e) {} }); waSrc = []; }
+function waSeq(parts, fallbackText) {
+    const token = speechToken;
+    return Promise.all(parts.map(waTrim)).then(items => new Promise(resolve => {
+        if (token !== speechToken) return resolve();
+        talking = true; applyMusic();
+        const rate = 1.12, gap = 0.04, g = actx.createGain(); g.gain.value = settings.volume; g.connect(actx.destination);
+        let t = actx.currentTime + 0.02, last = null; const t0 = t;
+        items.forEach((it, i) => {
+            const src = actx.createBufferSource(); src.buffer = it.buf; src.playbackRate.value = rate; src.connect(g);
+            src.start(t, it.s, it.d); waSrc.push(src); last = src;
+            waLog.push({ part: parts[i], at: +(t - t0).toFixed(3), dur: +(it.d / rate).toFixed(3), trimmed: +((it.full - it.d) / rate).toFixed(3) });
+            t += it.d / rate + gap;
+        });
+        let finished = false;
+        const done = () => { if (finished) return; finished = true; clearTimeout(timer); if (token === speechToken) { talking = false; speechDone = null; applyMusic(); } waSrc = []; resolve(); };
+        speechDone = done;
+        const timer = setTimeout(done, (t - t0 + 1) * 1000);
+        last.onended = done;
+    })).catch(() => { if (token !== speechToken) return; if (actx) actx._broken = true; return speakSeqOld(parts, fallbackText); });
+}
+function speakSeqOld(parts, fallbackText) {
     if (!clipsLoaded) { const t0 = speechToken; return audioReady.then(() => { if (t0 === speechToken) return speakSeq(parts, fallbackText); }); }
     stopSpeech();
     if (!settings.speech || settings.volume === 0) return Promise.resolve();
@@ -390,6 +429,14 @@ function speakSeq(parts, fallbackText) {
         };
         next();
     });
+}
+function speakSeq(parts, fallbackText) {
+    if (!clipsLoaded) { const t0 = speechToken; return audioReady.then(() => { if (t0 === speechToken) return speakSeq(parts, fallbackText); }); }
+    if (parts.length >= 1 && settings.speech && settings.volume > 0 && parts.every(k => audioMap[k])) {
+        const c = waCtx();
+        if (c && c.state === 'running' && !c._broken) { stopSpeech(); return waSeq(parts, fallbackText); }
+    }
+    return speakSeqOld(parts, fallbackText);
 }
 function mathQ(q) { return lang === 'ar' ? [T('Hur mycket är'), N(q.a), AR_OPS[q.op], N(q.b)] : ['Hur mycket är', String(q.a), OPK[q.op], String(q.b)]; }
 function mathFb(q) { return lang === 'ar' ? mathQ(q).join(' ') : 'Hur mycket är ' + q.speech + '?'; }
@@ -926,10 +973,19 @@ function renderSettings() {
             const o = document.createElement('option'); o.value=v; o.textContent=T(label);
             o.selected = (settings.level || 'easy') === v; level.appendChild(o);
         });
-        level.onchange = () => { settings.level=level.value; settings.cardCount=level.value==='hard'?16:9; settings.maxRange=level.value==='hard'?100:30; settings.minRange=1; saveSettings(); };
+        level.onchange = () => { settings.level=level.value; settings.cardCount=level.value==='hard'?16:9; settings.cardCountSet=false; settings.maxRange=level.value==='hard'?100:30; settings.minRange=1; saveSettings(); };
         levelRow.appendChild(level); sheet.appendChild(levelRow);
     }
+    if (game.cat === 'pussel') {
+        const pRow = el('div', 'settings-row');
+        pRow.appendChild(el('span', null, T('🧩 Antal delar')));
+        const ps = document.createElement('select');
+        [0, 2, 3, 4, 6, 8, 9, 12].forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n ? n : T('Automatisk'); if ((settings.pussPieces || 0) === n) o.selected = true; ps.appendChild(o); });
+        ps.onchange = () => { settings.pussPieces = parseInt(ps.value); saveSettings(); };
+        pRow.appendChild(ps); sheet.appendChild(pRow);
+    }
     const ccRow = el('div', 'settings-row');
+    if (game.cat === 'pussel') ccRow.style.display = 'none';
     ccRow.appendChild(el('span', null, T('🃏 Antal kort')));
     const cc = document.createElement('select');
     (activeProfile === 'selma' ? [2, 3, 4, 6, 9, 12, 16] : [6, 9, 12, 16]).forEach(n => {
@@ -937,7 +993,7 @@ function renderSettings() {
         o.value = n; o.textContent = n; if (settings.cardCount === n) o.selected = true;
         cc.appendChild(o);
     });
-    cc.onchange = () => { settings.cardCount = parseInt(cc.value); saveSettings(); };
+    cc.onchange = () => { settings.cardCount = parseInt(cc.value); settings.cardCountSet = true; saveSettings(); };
     ccRow.appendChild(cc);
     sheet.appendChild(ccRow);
 
@@ -1032,7 +1088,8 @@ Object.assign(CATEGORIES, {
     para: { name: 'Para ihop', icon: '👯', sub: 'Hitta paren' },
     pussel: { name: 'Pussel', icon: '🧩', sub: 'Dra biten på plats' },
     ballong: { name: 'Ballongpop', icon: '🎈', sub: 'Poppa rätt ballong' },
-    klockan: { name: 'Klockan', icon: '🕒', sub: 'Läs och ställ klockan' },
+    klockan: { name: 'Ställ klockan', icon: '🕒', sub: 'Flytta visarna' },
+    klockan2: { name: 'Vad är klockan?', icon: '⏰', sub: 'Skriv tiden' },
     text: { name: 'Textuppgifter', icon: '📖', sub: 'Små räknehistorier' },
     monster: { name: 'Mönster', icon: '🔁', sub: 'Vad kommer sen?' }
 });
@@ -1041,14 +1098,14 @@ SELMA_CATS.push(...SELMA_NEW); SELMA_ONLY.push(...SELMA_NEW);
 Object.assign(AR_UI, {
     'Para ihop': 'طابق الأزواج', 'Pussel': 'بزل', 'Ballongpop': 'فجّر البالونات', 'Klockan': 'الساعة', 'Textuppgifter': 'مسائل', 'Mönster': 'الأنماط',
     'Hitta paren': 'دوّر على الأزواج', 'Dra biten på plats': 'حط القطعة بمكانها', 'Poppa rätt ballong': 'فجّر البالونة الصحيحة',
-    'Läs och ställ klockan': 'اقرأ وظبّط الساعة', 'Små räknehistorier': 'حكايات حساب صغيرة', 'Vad kommer sen?': 'شنو يجي بعدين؟', 'Ställ klockan på': 'ظبّط الساعة على', 'Lyssna och räkna': 'اسمع وعدّ'
+    'Läs och ställ klockan': 'اقرأ وظبّط الساعة', 'Flytta visarna': 'حرّك العقارب', 'Skriv tiden': 'اكتب الوقت', 'Ställ klockan': 'ظبّط الساعة', 'Vad är klockan?': 'شكد الساعة؟', 'Små räknehistorier': 'حكايات حساب صغيرة', 'Vad kommer sen?': 'شنو يجي بعدين؟', 'Ställ klockan på': 'ظبّط الساعة على', 'Lyssna och räkna': 'اسمع وعدّ'
 });
 let nxLoaded = false;
 (function () {
     const p = new Promise(res => { const sc = document.createElement('script'); sc.src = 'nx-clips.js?v=1'; sc.onload = () => { Object.assign(audioMap, window.__arclips || {}); nxLoaded = true; res(); }; sc.onerror = () => res(); document.head.appendChild(sc); });
     clipsLoaded = false; audioReady = Promise.all([audioReady, p]); audioReady.then(() => { clipsLoaded = true; });
     const st = document.createElement('style');
-    st.textContent = '.nx-grid{display:grid;gap:12px;margin:12px 0}.nx-card .nx-back{font-size:clamp(34px,10vw,54px)}.nx-card.open{background:#fff8e1;color:#2d2a32}.nx-card.correct,.nx-card.correct.open{background:#d9f3e0;color:#2d2a32}.nx-stage{position:relative;margin:12px auto;touch-action:none}.nx-board{position:absolute;left:0;top:0;border-radius:18px;background:#fff;box-shadow:var(--shadow)}.nx-slot{position:absolute;overflow:hidden;box-sizing:border-box;border:2px dashed #c9c2d6}.nx-slot .nx-ph{opacity:.16;filter:grayscale(1)}.nx-piece{position:absolute;overflow:hidden;border-radius:10px;background:#fff;box-shadow:0 4px 12px rgba(45,42,50,.25);touch-action:none;cursor:grab;box-sizing:border-box}.nx-piece.placed{box-shadow:none;border-radius:0;cursor:default}.nx-sky{position:relative;height:340px;overflow:hidden;margin-top:8px}.nx-balloon{position:absolute;bottom:20px;width:84px;height:104px;border:0;border-radius:50% 50% 48% 48%;font-size:34px;font-weight:800;color:#fff;box-shadow:inset -8px -8px 0 rgba(0,0,0,.12),var(--shadow);animation:nxbob 2.6s ease-in-out infinite;transition:transform 1.1s ease-in,opacity 1.1s ease-in,bottom 1.1s ease-in}.nx-balloon:after{content:"";position:absolute;left:50%;top:100%;width:2px;height:60px;background:#8a8494}.nx-balloon.pop{transform:scale(1.6);opacity:0;transition:transform .3s,opacity .3s}.nx-balloon.away{bottom:420px;opacity:0;animation:none}@keyframes nxbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}.nx-clock,.nx-clock *,.nx-stage,.nx-stage *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.nx-clock{display:block;margin:10px auto;width:min(78vw,300px);height:auto;touch-action:none}.nx-digital{font-size:44px;font-weight:800;text-align:center}.nx-story{background:#fff;border-radius:18px;padding:14px;margin:10px 0;box-shadow:var(--shadow);font-size:20px;font-weight:700;line-height:1.5}.nx-icons{font-size:26px;line-height:1.3;margin-top:6px;word-break:break-all}.nx-seq{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;font-size:40px;margin:14px 0;background:#fff;border-radius:18px;padding:12px;box-shadow:var(--shadow)}.nx-seq .q{border:3px dashed #c9c2d6;border-radius:12px;min-width:52px;text-align:center}.nx-review{display:inline-block;margin-left:8px}';
+    st.textContent = '.nx-grid{display:grid;gap:12px;margin:12px 0}.nx-card .nx-back{font-size:clamp(34px,10vw,54px)}.nx-card.open{background:#fff8e1;color:#2d2a32}.nx-card.correct,.nx-card.correct.open{background:#d9f3e0;color:#2d2a32}.nx-stage{position:relative;margin:12px auto;touch-action:none}.nx-board{position:absolute;left:0;top:0;border-radius:18px;background:#fff;box-shadow:var(--shadow)}.nx-slot{position:absolute;overflow:hidden;box-sizing:border-box;border:2px dashed #c9c2d6}.nx-slot .nx-ph{opacity:.16;filter:grayscale(1)}.nx-piece{position:absolute;overflow:hidden;border-radius:10px;background:#fff;box-shadow:0 4px 12px rgba(45,42,50,.25);touch-action:none;cursor:grab;box-sizing:border-box}.nx-piece.placed{box-shadow:none;border-radius:0;cursor:default}.nx-sky{position:relative;height:340px;overflow:hidden;margin-top:8px}.nx-balloon{position:absolute;bottom:20px;width:84px;height:104px;border:0;border-radius:50% 50% 48% 48%;font-size:34px;font-weight:800;color:#fff;box-shadow:inset -8px -8px 0 rgba(0,0,0,.12),var(--shadow);animation:nxbob 2.6s ease-in-out infinite;transition:transform 1.1s ease-in,opacity 1.1s ease-in,bottom 1.1s ease-in}.nx-balloon:after{content:"";position:absolute;left:50%;top:100%;width:2px;height:60px;background:#8a8494}.nx-balloon.pop{transform:scale(1.6);opacity:0;transition:transform .3s,opacity .3s}.nx-balloon.away{bottom:420px;opacity:0;animation:none}@keyframes nxbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}.nx-clock,.nx-clock *,.nx-stage,.nx-stage *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.nx-clock{display:block;margin:10px auto;width:min(78vw,300px);height:auto;touch-action:none}.nx-digital{font-size:44px;font-weight:800;text-align:center}.nx-story{background:#fff;border-radius:18px;padding:14px;margin:10px 0;box-shadow:var(--shadow);font-size:20px;font-weight:700;line-height:1.5}.nx-icons{font-size:26px;line-height:1.3;margin-top:6px;word-break:break-all}.nx-seq{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;font-size:40px;margin:14px 0;background:#fff;border-radius:18px;padding:12px;box-shadow:var(--shadow)}.nx-seq .q{border:3px dashed #c9c2d6;border-radius:12px;min-width:52px;text-align:center}.nx-review{display:inline-block;margin-left:8px}.nx-k2 .prompt{padding:8px 14px;min-height:0;margin:4px 0}.nx-k2 .prompt .lead{font-size:16px}.nx-k2 .nx-clock{width:min(44vw,170px);margin:4px auto}.nx-k2 .nx-timein{margin:2px 0;font-size:36px}.nx-k2 .nx-tf{height:52px;min-width:72px}.nx-k2 .nx-pad{gap:6px;margin:6px auto}.nx-k2 .nx-key{height:46px;font-size:24px}.nx-timein{display:flex;align-items:center;justify-content:center;gap:8px;font-size:44px;font-weight:800;margin:6px 0}.nx-tf{min-width:84px;height:68px;border:3px solid #c9c2d6;border-radius:16px;background:#fff;font:inherit;color:#2d2a32}.nx-tf.on{border-color:#f5a623;box-shadow:0 0 0 3px rgba(245,166,35,.3)}.nx-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px auto;max-width:300px}.nx-key{height:58px;border:0;border-radius:14px;background:#fff;box-shadow:var(--shadow);font:inherit;font-size:28px;font-weight:800;color:#2d2a32}.nx-key.ok{background:#43b581;color:#fff}.nx-kropp{display:block;margin:6px auto;width:min(88vw,330px);height:auto;touch-action:manipulation;-webkit-user-select:none;user-select:none}.nx-kropp .kz{cursor:pointer;-webkit-tap-highlight-color:transparent}.nx-kropp.shake{animation:kshake .35s}@keyframes kshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}';
     document.head.appendChild(st);
 })();
 
@@ -1077,6 +1134,10 @@ function nxFrame() {
 function lk(k) { return 'cs-' + k + '-' + activeProfile + '-' + game.cat; }
 function lget(k, d) { try { const v = JSON.parse(localStorage.getItem(lk(k))); return v == null ? d : v; } catch (e) { return d; } }
 function lset(k, v) { try { localStorage.setItem(lk(k), JSON.stringify(v)); } catch (e) {} }
+function explicitCount() {
+    const d = (PROFILES[activeProfile] && PROFILES[activeProfile].defaults) || {};
+    return (settings.cardCountSet || settings.cardCount !== d.cardCount) ? settings.cardCount : null;
+}
 function lvl() { return Math.min(4, Math.max(1, lget('lvl', 1))); }
 function levelStep(ok, need) {
     need = need || 3;
@@ -1148,14 +1209,14 @@ function cardBtn(face, big) {
 
 /* --- Para ihop --- */
 function gPara() {
-    const L = lvl(), pairs = [2, 3, 4, 6][L - 1], body = nxFrame();
+    const L = lvl(), ec = explicitCount(), pairs = ec ? Math.max(1, Math.min(8, Math.floor(ec / 2))) : [2, 3, 4, 6][L - 1], body = nxFrame();
     const pool = localizeList(ANIMALS.concat(FOOD));
     const mk = missPick(pool.map(p => p[0]));
     let items = sample(pool, pairs);
     if (mk && !items.some(p => p[0] === mk)) items[0] = pool.find(p => p[0] === mk);
     const deck = sample(items.concat(items), pairs * 2);
     const grid = el('div', 'nx-grid');
-    grid.style.gridTemplateColumns = 'repeat(' + (pairs === 2 ? 2 : pairs === 3 ? 3 : 4) + ',1fr)';
+    grid.style.gridTemplateColumns = 'repeat(' + (pairs <= 2 ? 2 : pairs === 3 ? 3 : 4) + ',1fr)';
     body.appendChild(grid);
     let first = null, busy = false, matched = 0, mism = 0;
     deck.forEach(([face, name]) => {
@@ -1182,7 +1243,7 @@ function gPara() {
 
 /* --- Pussel --- */
 function gPussel() {
-    const L = lvl(), [cols, rows] = [[3, 1], [2, 2], [3, 2], [2, 3]][L - 1], body = nxFrame(), n = cols * rows;
+    const L = lvl(), [cols, rows] = settings.pussPieces ? ({ 2: [2, 1], 3: [3, 1], 4: [2, 2], 6: [3, 2], 8: [4, 2], 9: [3, 3], 12: [4, 3] })[settings.pussPieces] : [[3, 1], [2, 2], [3, 2], [2, 3]][L - 1], body = nxFrame(), n = cols * rows;
     const pool = localizeList(ANIMALS.concat(FOOD));
     const mk = missPick(pool.map(p => p[0]));
     const [face, name] = mk ? pool.find(p => p[0] === mk) : pick(pool);
@@ -1221,11 +1282,11 @@ function gPussel() {
 
 /* --- Ballongpop --- */
 function gBallong() {
-    const L = lvl(), n = [3, 4, 5, 5][L - 1], body = nxFrame();
+    const L = lvl(), ec = explicitCount(), n = ec ? Math.max(3, Math.min(8, ec)) : [3, 4, 5, 5][L - 1], body = nxFrame();
     const useFig = game.round % 2 === 0;
     const sv = [game.cat, settings.cardCount, settings.minRange, settings.maxRange];
     let built;
-    try { game.cat = useFig ? 'figurer' : 'siffror'; settings.cardCount = n; settings.minRange = 1; settings.maxRange = [5, 10, 20, 30][L - 1]; built = buildRound(); }
+    try { game.cat = useFig ? 'figurer' : 'siffror'; settings.cardCount = n; settings.minRange = 1; settings.maxRange = Math.max([5, 10, 20, 30][L - 1], n * 2); built = buildRound(); }
     finally { game.cat = sv[0]; settings.cardCount = sv[1]; settings.minRange = sv[2]; settings.maxRange = sv[3]; }
     const vals = built.values || [];
     const mk = missPick(vals.map(v => v.key));
@@ -1236,14 +1297,14 @@ function gBallong() {
     const sky = el('div', 'nx-sky'); body.appendChild(sky);
     const colors = ['#ef5b5b', '#4a90e2', '#43b581', '#f5a623', '#a259d9', '#f06fa8'];
     sample(vals, vals.length).forEach((v, i) => {
-        const b = el('button', 'nx-balloon'); b.style.left = 'calc(' + ((i + 0.5) * 100 / vals.length) + '% - 42px)'; b.style.background = colors[i % colors.length]; b.style.animationDelay = (i * 0.4) + 's';
+        const b = el('button', 'nx-balloon'); if (vals.length > 5) { const per = Math.ceil(vals.length / 2), col = i % per, row = Math.floor(i / per); b.style.width = '64px'; b.style.height = '80px'; b.style.fontSize = '26px'; b.style.bottom = (row ? 170 : 20) + 'px'; b.style.left = 'calc(' + ((col + 0.5) * 100 / per) + '% - 32px)'; } else b.style.left = 'calc(' + ((i + 0.5) * 100 / vals.length) + '% - 42px)'; b.style.background = colors[i % colors.length]; b.style.animationDelay = (i * 0.4) + 's';
         b.textContent = v.face; b.setAttribute('aria-label', v.name || v.face);
         b.onclick = () => {
             if (game.locked || b.dataset.gone) return;
             clearTimeout(roundTimer); stopSpeech();
             const sk = v.say || String(v.key).toLowerCase();
             if (v.key === target.key) { b.classList.add('pop'); missDel(target.key); levelStep(true); nxRight([sk, T('Rätt!')], sk + '. ' + T('Rätt!')); }
-            else { b.dataset.gone = '1'; b.classList.add('away'); missAdd(target.key); levelStep(false); speakSeq([sk], sk); }
+            else { b.dataset.gone = '1'; b.classList.add('away'); b.style.bottom = '420px'; missAdd(target.key); levelStep(false); speakSeq([sk], sk); }
         };
         sky.appendChild(b);
     });
@@ -1283,7 +1344,7 @@ function digital(h, m) { return h + ':' + (m < 10 ? '0' : '') + m; }
 function angDiff(a, b) { const d = Math.abs(((a - b) % 360 + 540) % 360 - 180); return d; }
 function gKlockan() {
     const L = Math.min(3, lvl()), body = nxFrame();
-    const mode = game.round % 2 === 1 ? 'read' : 'set';
+    const mode = 'set';
     const q = nextQ(() => { const ms = [[0], [0, 30], [0, 15, 30, 45]][L - 1]; const h = 1 + rn(12), m = pick(ms); return { mode, h, m, key: mode + ':' + h + ':' + m }; });
     game.lastKey = q.key; const { h, m } = q;
     const parts = timeParts(h, m), fb = parts.join(' ');
@@ -1331,6 +1392,42 @@ function gKlockan() {
         };
         autoSay(() => sayParts(parts));
     }
+}
+
+function gKlockan2() {
+    const L = Math.min(3, lvl()), body = nxFrame(); body.classList.add('nx-k2');
+    const q = nextQ(() => { const ms = [[0], [0, 30], [0, 15, 30, 45]][L - 1]; const h = 1 + rn(12), m = pick(ms); return { h, m, key: 'in:' + h + ':' + m }; });
+    game.lastKey = q.key; const { h, m } = q; game.locked = false;
+    const parts = timeParts(h, m), fb = parts.join(' ');
+    body.appendChild(promptBar(TT('Vad är klockan?'), '', () => sayParts([TT('Vad är klockan?')])));
+    body.appendChild(clockSvg((h % 12) * 30 + m * 0.5, m * 6));
+    let hh = '', mm = '', act = 'h';
+    const disp = el('div', 'nx-timein'); disp.dir = 'ltr';
+    const fh = el('button', 'nx-tf'), colon = el('span', null, ':'), fm = el('button', 'nx-tf');
+    fh.onclick = () => { act = 'h'; draw(); }; fm.onclick = () => { act = 'm'; draw(); };
+    disp.appendChild(fh); disp.appendChild(colon); disp.appendChild(fm); body.appendChild(disp);
+    const draw = () => { fh.textContent = hh || '–'; fm.textContent = mm || '–'; fh.classList.toggle('on', act === 'h'); fm.classList.toggle('on', act === 'm'); };
+    const pad = el('div', 'nx-pad'); pad.dir = 'ltr';
+    const press = d => {
+        if (game.locked) return; clearTimeout(roundTimer);
+        if (d === 'del') { if (act === 'm' && mm) mm = mm.slice(0, -1); else if (act === 'm') act = 'h'; else hh = hh.slice(0, -1); draw(); return; }
+        if (d === 'ok') {
+            if (!hh || !mm) return;
+            stopSpeech();
+            if (parseInt(hh, 10) === h && parseInt(mm, 10) === m) { missDel(q.key); levelStep(true); nxRight(parts, fb); }
+            else { missAdd(q.key, q); levelStep(false); nxWrong([T('Nej, det är fel.')], T('Nej, det är fel.')); mm = ''; act = 'm'; draw(); }
+            return;
+        }
+        if (act === 'h') { hh += d; if (hh.length >= 2 || +d >= 2) { hh = hh.slice(0, 2); act = 'm'; } }
+        else { mm += d; mm = mm.slice(0, 2); }
+        draw();
+    };
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].forEach(k => {
+        const b = el('button', 'nx-key' + (k === 'ok' ? ' ok' : ''), k === 'del' ? '⌫' : k === 'ok' ? '✔' : k);
+        b.onclick = () => press(k); pad.appendChild(b);
+    });
+    body.appendChild(pad); draw();
+    autoSay(() => sayParts([TT('Vad är klockan?')]));
 }
 
 /* --- Textuppgifter --- */
@@ -1409,7 +1506,73 @@ function gMonster() {
     autoSay(() => sayParts([TT('Vad kommer sen?')]));
 }
 
-const NXGAMES = { para: gPara, pussel: gPussel, ballong: gBallong, klockan: gKlockan, text: gText, monster: gMonster };
+
+/* --- Kroppen: peka på ansikte och kropp --- */
+const KFACE = [
+  ['👄', [['e', 150, 228, 62, 44]]], ['👁️', [['e', 103, 118, 40, 34], ['e', 197, 118, 40, 34]]], ['👃', [['e', 150, 170, 30, 32]]],
+  ['👂', [['e', 30, 150, 30, 44], ['e', 270, 150, 30, 44]]], ['🦷', [['e', 150, 208, 36, 13]]], ['👅', [['e', 150, 244, 28, 16]]]];
+const KBODY = [
+  ['💪', [['l', 96, 135, 52, 212, 58], ['l', 204, 135, 248, 212, 58]]], ['🦵', [['l', 128, 250, 124, 350, 58], ['l', 172, 250, 176, 350, 58]]],
+  ['✋', [['e', 42, 236, 30, 30], ['e', 258, 236, 30, 30]]], ['🦶', [['e', 112, 378, 40, 26], ['e', 188, 378, 40, 26]]]];
+function kSvg(scene) {
+  const NS = 'http://www.w3.org/2000/svg', sk = '#f6c89f', sk2 = '#e9a77a', dk = '#2d2a32';
+  const svg = svgEl('svg', { viewBox: scene === 'face' ? '0 0 300 300' : '0 0 300 420', class: 'nx-kropp' });
+  const add = (t, a) => { const e = svgEl(t, a); svg.appendChild(e); return e; };
+  if (scene === 'face') {
+    add('ellipse', { cx: 30, cy: 150, rx: 24, ry: 36, fill: sk2 }); add('ellipse', { cx: 270, cy: 150, rx: 24, ry: 36, fill: sk2 });
+    add('ellipse', { cx: 30, cy: 150, rx: 11, ry: 20, fill: '#d98a5f' }); add('ellipse', { cx: 270, cy: 150, rx: 11, ry: 20, fill: '#d98a5f' });
+    add('ellipse', { cx: 150, cy: 150, rx: 120, ry: 135, fill: sk });
+    add('path', { d: 'M40 120 Q50 22 150 18 Q250 22 260 120 Q215 70 150 72 Q85 70 40 120Z', fill: '#7a4a2b' });
+    [103, 197].forEach(x => { add('ellipse', { cx: x, cy: 118, rx: 27, ry: 23, fill: '#fff', stroke: dk, 'stroke-width': 3 }); add('circle', { cx: x, cy: 120, r: 12, fill: '#3b7dd8' }); add('circle', { cx: x, cy: 120, r: 6, fill: dk }); add('circle', { cx: x + 4, cy: 115, r: 3, fill: '#fff' }); });
+    add('path', { d: 'M150 150 Q128 182 150 188 Q172 182 150 150Z', fill: sk2 });
+    add('path', { d: 'M96 212 Q150 196 204 212 Q196 266 150 268 Q104 266 96 212Z', fill: '#8c2f3c' });
+    add('path', { d: 'M114 205 Q150 197 186 205 L184 220 Q150 214 116 220Z', fill: '#fff' });
+    add('path', { d: 'M122 248 Q150 224 178 248 Q166 268 150 268 Q134 268 122 248Z', fill: '#ee6f8a' });
+    add('circle', { cx: 62, cy: 190, r: 14, fill: '#f4a08a', opacity: .5 }); add('circle', { cx: 238, cy: 190, r: 14, fill: '#f4a08a', opacity: .5 });
+  } else {
+    [[96, 135, 52, 212], [204, 135, 248, 212]].forEach(a => add('line', { x1: a[0], y1: a[1], x2: a[2], y2: a[3], stroke: '#4a90e2', 'stroke-width': 40, 'stroke-linecap': 'round' }));
+    [[128, 250, 124, 350], [172, 250, 176, 350]].forEach(a => add('line', { x1: a[0], y1: a[1], x2: a[2], y2: a[3], stroke: '#3a4a8a', 'stroke-width': 40, 'stroke-linecap': 'round' }));
+    add('rect', { x: 90, y: 105, width: 120, height: 160, rx: 40, fill: '#4a90e2' });
+    [42, 258].forEach(x => add('circle', { cx: x, cy: 236, r: 22, fill: sk }));
+    [112, 188].forEach(x => add('ellipse', { cx: x, cy: 378, rx: 32, ry: 18, fill: '#ee5a6f' }));
+    add('circle', { cx: 150, cy: 62, r: 48, fill: sk }); add('path', { d: 'M102 58 Q110 14 150 14 Q190 14 198 58 Q170 36 150 38 Q130 36 102 58Z', fill: '#7a4a2b' });
+    [132, 168].forEach(x => add('circle', { cx: x, cy: 66, r: 5, fill: dk })); add('path', { d: 'M135 86 Q150 98 165 86', fill: 'none', stroke: dk, 'stroke-width': 4, 'stroke-linecap': 'round' });
+  }
+  return svg;
+}
+function gKroppen() {
+  const L = lvl(), body = nxFrame(); body.classList.add('nx-k2');
+  const names = {}; localizeList(BODY).forEach(([f, n]) => { names[f] = n; });
+  const scene = L >= 3 && game.round % 2 === 0 ? 'body' : 'face';
+  const parts = scene === 'body' ? KBODY : (L === 1 ? KFACE.slice(0, 4) : KFACE);
+  const mk = missPick(parts.map(p => p[0]));
+  const target = mk ? parts.find(p => p[0] === mk) : pick(parts.filter(p => p[0] !== game.lastKey));
+  game.review = !!mk; game.lastKey = target[0]; game.locked = false;
+  const nm = names[target[0]];
+  const sp = lang === 'ar' ? { parts: [T('Hitta ').trim(), nm], speech: T('Hitta ').trim() + ' ' + nm } : { parts: [T('Hitta ') + nm], speech: T('Hitta ') + nm };
+  body.appendChild(promptBar(T('Peka på') + ':', nm, () => sayT(sp)));
+  const svg = kSvg(scene); svg.style.width = Math.max(200, Math.min(330, innerWidth * 0.88, scene === 'body' ? (innerHeight - 200) * 300 / 420 : 400)) + 'px'; body.appendChild(svg);
+  parts.forEach(([face, shapes]) => shapes.forEach(sh => {
+    const z = sh[0] === 'e' ? svgEl('ellipse', { cx: sh[1], cy: sh[2], rx: sh[3], ry: sh[4], fill: 'rgba(0,0,0,0.001)', 'data-part': face })
+      : svgEl('line', { x1: sh[1], y1: sh[2], x2: sh[3], y2: sh[4], stroke: 'rgba(0,0,0,0.001)', 'stroke-width': sh[5], 'stroke-linecap': 'round', 'data-part': face });
+    z.classList.add('kz'); z.style.pointerEvents = sh[0] === 'e' ? 'all' : 'stroke';
+    z.onclick = () => {
+      if (game.locked) return; clearTimeout(roundTimer); stopSpeech();
+      if (face === target[0]) {
+        svg.querySelectorAll('.kz[data-part="' + face + '"]').forEach(q => { if (q.tagName === 'line') q.setAttribute('stroke', 'rgba(67,181,129,.6)'); else q.setAttribute('fill', 'rgba(67,181,129,.6)'); });
+        missDel(face); levelStep(true); nxRight([nm, T('Rätt!')], nm + '. ' + T('Rätt!'));
+      } else {
+        const tn = names[face]; missAdd(target[0]); levelStep(false);
+        svg.classList.remove('shake'); void svg.getBoundingClientRect(); svg.classList.add('shake');
+        speakSeq([tn], tn);
+      }
+    };
+    svg.appendChild(z);
+  }));
+  autoSay(() => sayT(sp));
+}
+
+const NXGAMES = { kroppen: gKroppen, para: gPara, pussel: gPussel, ballong: gBallong, klockan: gKlockan, klockan2: gKlockan2, text: gText, monster: gMonster };
 const _nxStart = startGame, _nxNew = newRound;
 startGame = function (cat) {
     if (NXGAMES[cat]) { game.cat = cat; game.round = 1; game.stars = 0; game.good = 0; game.bad = 0; game.lastKey = null; game.review = false; newRound(); }
