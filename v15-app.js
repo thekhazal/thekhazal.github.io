@@ -1,7 +1,7 @@
 /* Celia och Selmas Spel.
    Ren HTML/CSS/JS, inga externa tjänster förutom teckensnitt och egna ljudfiler. */
 
-(function(){ const st = document.createElement('style'); st.textContent = '.tile.mat{background:linear-gradient(160deg,#ff8d8d,#ee5a6f)}.tile.saker{background:linear-gradient(160deg,#5ed0d8,#2aa7c9)}.tile.kroppen{background:linear-gradient(160deg,#ffa8cf,#f06aa8)}'; document.head.appendChild(st); })();
+(function(){ const st = document.createElement('style'); st.textContent = '.tile.mat{background:linear-gradient(160deg,#ff8d8d,#ee5a6f)}.tile.saker{background:linear-gradient(160deg,#5ed0d8,#2aa7c9)}.tile.kroppen{background:linear-gradient(160deg,#ffa8cf,#f06aa8)}.tile.klockan{background:linear-gradient(160deg,#6c8cf0,#3f5bd6)}.tile.klockan2{background:linear-gradient(160deg,#ffc15e,#f08a24)}.tile.text{background:linear-gradient(160deg,#b58cf5,#7e4fd8)}.tile.monster{background:linear-gradient(160deg,#5ed0a0,#25a07a)}.tile.para{background:linear-gradient(160deg,#ff9cc0,#e8587f)}.tile.pussel{background:linear-gradient(160deg,#7fd1ff,#3a9ee0)}.tile.ballong{background:linear-gradient(160deg,#ff8d8d,#ee5a6f)}'; document.head.appendChild(st); })();
 /* ---------- språk: svenska och irakisk arabiska ---------- */
 let lang = 'sv';
 try { lang = localStorage.getItem('cs-lang') === 'ar' ? 'ar' : 'sv'; } catch (e) {}
