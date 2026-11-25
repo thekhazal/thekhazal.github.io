@@ -106,7 +106,7 @@ function applyLang() {
     if (ar && !document.getElementById('cairoFont')) { const l = document.createElement('link'); l.id = 'cairoFont'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&display=swap'; document.head.appendChild(l); }
 }
 function setLang(l) { lang = l; try { localStorage.setItem('cs-lang', l); } catch (e) {} applyLang(); stopSpeech(); }
-(function(){ const st = document.createElement('style'); st.textContent = 'html[dir=rtl] body,html[dir=rtl] button,html[dir=rtl] input,html[dir=rtl] select{font-family:"Cairo","Baloo 2",system-ui,sans-serif} html[dir=rtl] .keypad,html[dir=rtl] .math-eq,html[dir=rtl] .math-pics,html[dir=rtl] .range-pair{direction:ltr} html[dir=rtl] .math-eq .write-lead{direction:rtl} .lang-pill{display:block;margin:14px auto 0;border:none;border-radius:999px;padding:10px 20px;background:#fff;box-shadow:0 6px 18px rgba(45,42,50,.12);font:700 16px inherit;font-family:inherit;color:#2d2a32;cursor:pointer}'; document.head.appendChild(st); })();
+(function(){ const st = document.createElement('style'); st.textContent = 'html[dir=rtl] body,html[dir=rtl] button,html[dir=rtl] input,html[dir=rtl] select{font-family:"Cairo","Baloo 2",system-ui,sans-serif} html[dir=rtl] .keypad,html[dir=rtl] .math-eq,html[dir=rtl] .math-pics,html[dir=rtl] .range-pair{direction:ltr} html[dir=rtl] .math-eq .write-lead{direction:rtl} .langsel{min-width:160px}.lang-pill{display:block;margin:14px auto 0;border:none;border-radius:999px;padding:10px 20px;background:#fff;box-shadow:0 6px 18px rgba(45,42,50,.12);font:700 16px inherit;font-family:inherit;color:#2d2a32;cursor:pointer}'; document.head.appendChild(st); })();
 applyLang();
 
 const PROFILES = {
@@ -866,7 +866,7 @@ function renderSettings() {
 
     const langRow = el('div', 'settings-row');
     langRow.appendChild(el('span', null, T('🌐 Språk')));
-    const ls = document.createElement('select');
+    const ls = document.createElement('select'); ls.className = 'langsel';
     [['sv', 'Svenska'], ['ar', 'العراقية (عربي)']].forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; o.selected = lang === v; ls.appendChild(o); });
     ls.onchange = () => { setLang(ls.value); overlay.remove(); refreshView(); };
     langRow.appendChild(ls);
