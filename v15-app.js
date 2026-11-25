@@ -322,8 +322,11 @@ function feedbackFx(right, parts, fallbackText) {
     if (!settings.speech) return fx;
     return fx.then(() => speakSeq(parts, fallbackText));
 }
+let prunedN = -1;
+function pruneAudio() { const ks = Object.keys(audioMap); if (ks.length === prunedN) return; ks.forEach(k => { const v = audioMap[k]; if (typeof v !== 'string' || v.length < 200) delete audioMap[k]; }); prunedN = Object.keys(audioMap).length; }
 function speak(text) {
     if (!clipsLoaded) { const t0 = speechToken; return audioReady.then(() => { if (t0 === speechToken) return speak(text); }); }
+    pruneAudio();
     stopSpeech();
     if (!settings.speech || settings.volume === 0) return Promise.resolve();
     if (audioMap[text]) { const c = waCtx(); if (c && c.state === 'running' && !c._broken) return waSeq([text], text); }
@@ -436,6 +439,7 @@ function speakSeqOld(parts, fallbackText) {
 }
 function speakSeq(parts, fallbackText) {
     if (!clipsLoaded) { const t0 = speechToken; return audioReady.then(() => { if (t0 === speechToken) return speakSeq(parts, fallbackText); }); }
+    pruneAudio();
     if (parts.length >= 1 && settings.speech && settings.volume > 0 && parts.every(k => audioMap[k])) {
         const c = waCtx();
         if (c && c.state === 'running' && !c._broken) { stopSpeech(); return waSeq(parts, fallbackText); }
