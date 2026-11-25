@@ -1024,12 +1024,12 @@ function route() {
 const NXP = {"Hitta paret": "دوّر على الزوج", "Bra, ett par!": "عاش! زوج!", "Sätt biten på rätt plats": "حط القطعة بمكانها", "Klart! Vilken fin bild!": "خلصت! صورة حلوة!", "Vad är klockan?": "شكد الساعة؟", "Klockan är": "الساعة", "halv": "ونص", "kvart över": "وربع", "kvart i": "إلا ربع", "Vad kommer sen?": "شنو يجي بعدين؟", "Du har": "عندك", "Du får": "وصلك", "till.": "بعد.", "Du ger bort": "تعطي", "Hur många har du nu?": "هسه شكد عندك؟", "Hur många har du kvar?": "شكد بقالك؟", "Nu övar vi en gång till.": "نعيدها مرة ثانية.", "ett": "واحد", "två": "ثنين", "tre": "ثلاثة", "fyra": "أربعة", "fem": "خمسة", "sex": "ستة", "sju": "سبعة", "åtta": "ثمانية", "nio": "تسعة", "tio": "عشرة", "elva": "احدعش", "tolv": "اثنعش", "äpplen": "تفاحات", "bollar": "كرات", "bilar": "سيارات", "blommor": "ورود", "kakor": "كعكات", "fiskar": "سمكات", "ballonger": "بالونات", "stjärnor": "نجمات"};
 const SVNUM = ['', 'ett', 'två', 'tre', 'fyra', 'fem', 'sex', 'sju', 'åtta', 'nio', 'tio', 'elva', 'tolv'];
 const NXOBJ = [['🍎', 'äpplen', 'تفاحات'], ['⚽', 'bollar', 'كرات'], ['🚗', 'bilar', 'سيارات'], ['🌸', 'blommor', 'ورود'], ['🍪', 'kakor', 'كعكات'], ['🐟', 'fiskar', 'سمكات'], ['🎈', 'ballonger', 'بالونات'], ['⭐', 'stjärnor', 'نجمات']];
-const NXTOK = ['🔴', '🔵', '🟢', '🟡', '⭐', '🌙', '🍎', '🍌', '🐟', '🌸'];
+const NXTOK = ['🔴', '🔵', '🟢', '🟡', '⭐', '🌙', '🍇', '🍌', '🐟', '🌸'];
 function TT(s) { return lang === 'ar' && NXP[s] ? NXP[s] : s; }
 function nw(n) { return lang === 'ar' ? N(n) : SVNUM[n]; }
 const rn = n => Math.floor(Math.random() * n);
 Object.assign(CATEGORIES, {
-    para: { name: 'Para ihop', icon: '🃏', sub: 'Hitta paren' },
+    para: { name: 'Para ihop', icon: '👯', sub: 'Hitta paren' },
     pussel: { name: 'Pussel', icon: '🧩', sub: 'Dra biten på plats' },
     ballong: { name: 'Ballongpop', icon: '🎈', sub: 'Poppa rätt ballong' },
     klockan: { name: 'Klockan', icon: '🕒', sub: 'Läs och ställ klockan' },
@@ -1048,7 +1048,7 @@ let nxLoaded = false;
     const p = new Promise(res => { const sc = document.createElement('script'); sc.src = 'nx-clips.js?v=1'; sc.onload = () => { Object.assign(audioMap, window.__arclips || {}); nxLoaded = true; res(); }; sc.onerror = () => res(); document.head.appendChild(sc); });
     clipsLoaded = false; audioReady = Promise.all([audioReady, p]); audioReady.then(() => { clipsLoaded = true; });
     const st = document.createElement('style');
-    st.textContent = '.nx-grid{display:grid;gap:12px;margin:12px 0}.nx-card .nx-back{font-size:clamp(34px,10vw,54px)}.nx-card.open{background:#fff8e1}.nx-stage{position:relative;margin:12px auto;touch-action:none}.nx-board{position:absolute;left:0;top:0;border-radius:18px;background:#fff;box-shadow:var(--shadow)}.nx-slot{position:absolute;overflow:hidden;box-sizing:border-box;border:2px dashed #c9c2d6}.nx-slot .nx-ph{opacity:.16;filter:grayscale(1)}.nx-piece{position:absolute;overflow:hidden;border-radius:10px;background:#fff;box-shadow:0 4px 12px rgba(45,42,50,.25);touch-action:none;cursor:grab;box-sizing:border-box}.nx-piece.placed{box-shadow:none;border-radius:0;cursor:default}.nx-sky{position:relative;height:340px;overflow:hidden;margin-top:8px}.nx-balloon{position:absolute;bottom:20px;width:84px;height:104px;border:0;border-radius:50% 50% 48% 48%;font-size:34px;font-weight:800;color:#fff;box-shadow:inset -8px -8px 0 rgba(0,0,0,.12),var(--shadow);animation:nxbob 2.6s ease-in-out infinite;transition:transform 1.1s ease-in,opacity 1.1s ease-in,bottom 1.1s ease-in}.nx-balloon:after{content:"";position:absolute;left:50%;top:100%;width:2px;height:60px;background:#8a8494}.nx-balloon.pop{transform:scale(1.6);opacity:0;transition:transform .3s,opacity .3s}.nx-balloon.away{bottom:420px;opacity:0;animation:none}@keyframes nxbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}.nx-clock{display:block;margin:10px auto;width:min(78vw,300px);height:auto;touch-action:none}.nx-digital{font-size:44px;font-weight:800;text-align:center}.nx-story{background:#fff;border-radius:18px;padding:14px;margin:10px 0;box-shadow:var(--shadow);font-size:20px;font-weight:700;line-height:1.5}.nx-icons{font-size:26px;line-height:1.3;margin-top:6px;word-break:break-all}.nx-seq{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;font-size:40px;margin:14px 0;background:#fff;border-radius:18px;padding:12px;box-shadow:var(--shadow)}.nx-seq .q{border:3px dashed #c9c2d6;border-radius:12px;min-width:52px;text-align:center}.nx-review{display:inline-block;margin-left:8px}';
+    st.textContent = '.nx-grid{display:grid;gap:12px;margin:12px 0}.nx-card .nx-back{font-size:clamp(34px,10vw,54px)}.nx-card.open{background:#fff8e1;color:#2d2a32}.nx-card.correct,.nx-card.correct.open{background:#d9f3e0;color:#2d2a32}.nx-stage{position:relative;margin:12px auto;touch-action:none}.nx-board{position:absolute;left:0;top:0;border-radius:18px;background:#fff;box-shadow:var(--shadow)}.nx-slot{position:absolute;overflow:hidden;box-sizing:border-box;border:2px dashed #c9c2d6}.nx-slot .nx-ph{opacity:.16;filter:grayscale(1)}.nx-piece{position:absolute;overflow:hidden;border-radius:10px;background:#fff;box-shadow:0 4px 12px rgba(45,42,50,.25);touch-action:none;cursor:grab;box-sizing:border-box}.nx-piece.placed{box-shadow:none;border-radius:0;cursor:default}.nx-sky{position:relative;height:340px;overflow:hidden;margin-top:8px}.nx-balloon{position:absolute;bottom:20px;width:84px;height:104px;border:0;border-radius:50% 50% 48% 48%;font-size:34px;font-weight:800;color:#fff;box-shadow:inset -8px -8px 0 rgba(0,0,0,.12),var(--shadow);animation:nxbob 2.6s ease-in-out infinite;transition:transform 1.1s ease-in,opacity 1.1s ease-in,bottom 1.1s ease-in}.nx-balloon:after{content:"";position:absolute;left:50%;top:100%;width:2px;height:60px;background:#8a8494}.nx-balloon.pop{transform:scale(1.6);opacity:0;transition:transform .3s,opacity .3s}.nx-balloon.away{bottom:420px;opacity:0;animation:none}@keyframes nxbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}.nx-clock,.nx-clock *,.nx-stage,.nx-stage *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.nx-clock{display:block;margin:10px auto;width:min(78vw,300px);height:auto;touch-action:none}.nx-digital{font-size:44px;font-weight:800;text-align:center}.nx-story{background:#fff;border-radius:18px;padding:14px;margin:10px 0;box-shadow:var(--shadow);font-size:20px;font-weight:700;line-height:1.5}.nx-icons{font-size:26px;line-height:1.3;margin-top:6px;word-break:break-all}.nx-seq{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;font-size:40px;margin:14px 0;background:#fff;border-radius:18px;padding:12px;box-shadow:var(--shadow)}.nx-seq .q{border:3px dashed #c9c2d6;border-radius:12px;min-width:52px;text-align:center}.nx-review{display:inline-block;margin-left:8px}';
     document.head.appendChild(st);
 })();
 
@@ -1207,7 +1207,7 @@ function gPussel() {
             playSound('clickSound'); placed++;
             if (placed === n) { levelStep(misses <= n, 2); if (misses >= 3) missAdd(face); else missDel(face); nxRight([name, TT('Klart! Vilken fin bild!')], name + '. ' + TT('Klart! Vilken fin bild!')); }
         };
-        p.onpointerdown = e => { if (p.dataset.placed || game.locked) return; try { p.setPointerCapture(e.pointerId); } catch (x) {} st = { sx: e.clientX, sy: e.clientY, ox: parseFloat(p.style.left), oy: parseFloat(p.style.top), moved: false }; p.style.transition = 'none'; p.style.zIndex = 20; };
+        p.onpointerdown = e => { e.preventDefault(); if (p.dataset.placed || game.locked) return; try { p.setPointerCapture(e.pointerId); } catch (x) {} st = { sx: e.clientX, sy: e.clientY, ox: parseFloat(p.style.left), oy: parseFloat(p.style.top), moved: false }; p.style.transition = 'none'; p.style.zIndex = 20; };
         p.onpointermove = e => { if (!st) return; const dx = e.clientX - st.sx, dy = e.clientY - st.sy; if (Math.abs(dx) + Math.abs(dy) > 8) st.moved = true; p.style.left = (st.ox + dx) + 'px'; p.style.top = (st.oy + dy) + 'px'; };
         p.onpointerup = p.onpointercancel = e => {
             if (!st) return; const s = st; st = null;
@@ -1314,14 +1314,14 @@ function gKlockan() {
         const ang = e => { const r = svg.getBoundingClientRect(); return (Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI + 360) % 360; };
         const tip = (a, len) => [Math.sin(a * Math.PI / 180) * len, -Math.cos(a * Math.PI / 180) * len];
         svg.onpointerdown = e => {
-            if (game.locked) return; try { svg.setPointerCapture(e.pointerId); } catch (x) {}
+            e.preventDefault(); if (game.locked) return; try { svg.setPointerCapture(e.pointerId); } catch (x) {}
             const r = svg.getBoundingClientRect(), sc = r.width / 200, px = e.clientX - (r.left + r.width / 2), py = e.clientY - (r.top + r.height / 2);
             const th = tip(svg._h, 44 * sc), tm = tip(svg._m, 72 * sc);
             sel = Math.hypot(px - th[0], py - th[1]) < Math.hypot(px - tm[0], py - tm[1]) ? 'h' : 'm';
             svg.onpointermove(e);
         };
         svg.onpointermove = e => {
-            if (!sel || game.locked) return; const a = ang(e);
+            if (sel) e.preventDefault(); if (!sel || game.locked) return; const a = ang(e);
             if (sel === 'm') svg.setHands(svg._h, Math.round(a / 30) * 30 % 360); else svg.setHands(Math.round(a / 7.5) * 7.5 % 360, svg._m);
         };
         svg.onpointerup = svg.onpointercancel = e => {
