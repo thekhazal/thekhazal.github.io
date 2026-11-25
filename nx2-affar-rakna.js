@@ -58,7 +58,7 @@
         + '.nx-drag{position:absolute;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:14px;box-shadow:0 4px 12px rgba(45,42,50,.25);touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none;z-index:5;box-sizing:border-box}'
         + '.nx-drag.inb{box-shadow:none;background:transparent}'
         + '.nx-drag.shake{animation:kshake .35s}'
-        + '.nx-count{text-align:center;font-size:22px;font-weight:800;color:#2d2a32;margin:4px 0}';
+        + '.nx-count{text-align:center;font-size:22px;font-weight:800;color:#2d2a32;margin:4px 0;direction:ltr}';
     document.head.appendChild(st);
 
     function combos(faces, n) {
