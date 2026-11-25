@@ -93,7 +93,13 @@
         const body = nxFrame();
         const listText = list.map(f => itemCounted(f, need[f])).join(lang === 'ar' ? ' و ' : ' och ');
         const promptText = T('Handla:') + ' ' + listText;
-        body.appendChild(promptBar(T('Handla:'), '', () => speak(promptText)));
+        /* Prompten läser listan med inspelade röster: svenska "Hitta …"-klipp per vara,
+           arabiska "دوّر على" + varans namn. Hela meningen finns kvar som TTS-reserv. */
+        const promptClips = lang === 'ar'
+            ? list.reduce((a, f) => a.concat(['دوّر على', itemName(f, false)]), [])
+            : list.map(f => 'Hitta ' + itemName(f, false));
+        const sayList = () => speakSeq(promptClips, promptText);
+        body.appendChild(promptBar(T('Handla:'), '', sayList));
         const listEl = el('div', 'shop-list');
         const rows = {};
         list.forEach(f => {
@@ -134,7 +140,7 @@
             };
             shelf.appendChild(c);
         });
-        autoSay(() => speak(promptText));
+        autoSay(sayList);
     }
 
     function gAffarCelia() {
@@ -157,13 +163,29 @@
         if (L === 3) { rows[rn(rows.length)].qty = 2; }
         if (L >= 4) { rows[rn(rows.length)].qty = 2; if (Math.random() < 0.5) rows[rn(rows.length)].qty = 3; }
         let total = rows.reduce((s, r) => s + r.price * r.qty, 0);
+        /* Håll totalsvaret ≤ 30: då finns alltid inspelade sifferklipp för återkopplingen. */
+        let capGuard = 80;
+        while (total > 30 && capGuard-- > 0) {
+            const r = rows[rn(rows.length)];
+            if (r.qty > 1) r.qty--; else if (r.price > 1) r.price--;
+            total = rows.reduce((s, x) => s + x.price * x.qty, 0);
+        }
         const pay = L >= 4 ? 50 : 20;
         if (changeMode) {
-            let guard = 60;
-            while (total >= pay && guard-- > 0) {
+            let guard = 80;
+            while ((total >= pay || (pay === 50 && pay - total > 30) || pay - total < 1) && guard-- > 0) {
                 const r = rows[rn(rows.length)];
-                if (r.qty > 1) r.qty--; else if (r.price > 1) r.price--;
+                if (total >= pay || pay - total < 1) { if (r.qty > 1) r.qty--; else if (r.price > 1) r.price--; }
+                else { if (r.price < maxP) r.price++; else if (r.qty < 2) r.qty++; }
                 total = rows.reduce((s, x) => s + x.price * x.qty, 0);
+            }
+            if (pay - total < 1 || pay - total > 30) {
+                rows.forEach(r => { r.qty = 1; r.price = 1; });
+                total = rows.length;
+                const want = pay === 50 ? 20 + rn(11) : 5 + rn(12);
+                let g2 = 200;
+                while (total < want && g2-- > 0) { const r = rows[rn(rows.length)]; if (r.price < maxP) { r.price++; total++; } }
+                while (total > want && g2-- > 0) { const r = rows[rn(rows.length)]; if (r.price > 1) { r.price--; total--; } }
             }
         }
         const answer = changeMode ? pay - total : total;
@@ -356,10 +378,9 @@
                         return;
                     }
                     if (inBasket() >= target) {
-                        setFeedback(T('För många!'), 'bad');
                         d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
                         place(it.hx, it.hy, true); d.style.zIndex = 5;
-                        speak(T('Det räcker!'));
+                        nxWrong([T('Nej, det är fel.')], T('Nej, det är fel.'));
                         return;
                     }
                     it.inB = true; d.classList.add('inb');
