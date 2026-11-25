@@ -705,7 +705,7 @@ function mathSpace(cat, hard) {
 }
 function newMathRound() {
     const hard = settings.level === 'hard';
-    const scope = game.cat + (hard ? ':h' : ':e');
+    const scope = game.cat;
     const space = mathSpace(game.cat, hard);
     const keys = space.map(t => t.join(':'));
     const drawn = bagTake(keys, 1, lgetS('last', null, scope), scope);
@@ -1177,52 +1177,47 @@ function lset(k, v) { try { localStorage.setItem(lk(k), JSON.stringify(v)); } ca
 function lkS(k, scope) { return 'cs-' + k + '-' + activeProfile + '-' + (scope || game.cat); }
 function lgetS(k, d, scope) { try { const v = JSON.parse(localStorage.getItem(lkS(k, scope))); return v == null ? d : v; } catch (e) { return d; } }
 function lsetS(k, v, scope) { try { localStorage.setItem(lkS(k, scope), JSON.stringify(v)); } catch (e) {} }
-/* Variation: allt i poolen kommer en gång innan något återkommer. Missade kommer först när allt annat visats. */
+/* Variation: allt i poolen kommer en gång innan något återkommer.
+   Per spel sparas vilka nycklar som visats ("shown"); nivå- och scenbyten
+   bygger vidare på samma lista, så inget återkommer förrän hela den
+   aktuella poolen setts. Missade kommer först i nästa omgång, men aldrig
+   som direkt upprepning av den allra senaste frågan. */
 function bagTake(allKeys, count, avoid, scope, missFn) {
     const inPool = new Set(allKeys);
-    const rawB = lgetS('bag', null, scope), rawM = lgetS('bagm', null, scope);
-    let bag = Array.isArray(rawB) ? rawB.filter(k => inPool.has(k)) : [];
-    let bagm = Array.isArray(rawM) ? rawM.filter(k => inPool.has(k)) : [];
-    const hadState = (Array.isArray(rawB) && rawB.length > 0) || (Array.isArray(rawM) && rawM.length > 0);
-    let silent = (rawB === null && rawM === null) || (hadState && !bag.length && !bagm.length);
+    let stored = lgetS('shown', [], scope);
+    if (!Array.isArray(stored)) stored = [];
+    const stale = stored.filter(k => !inPool.has(k));
+    const shownSet = new Set(stored.filter(k => inPool.has(k)));
     let exhausted = false;
     const out = [];
+    const drawOne = (cands, av) => {
+        if (!cands.length) return null;
+        let c = cands;
+        if (av != null && cands.length > 1) { const f = cands.filter(k => k !== av); if (f.length) c = f; }
+        return c[Math.floor(Math.random() * c.length)];
+    };
     while (out.length < count) {
-        if (!bagm.length && !bag.length) {
-            if (!silent) exhausted = true;
-            silent = false;
-            const missed = (missFn ? missFn() : []).filter(k => inPool.has(k) && out.indexOf(k) === -1);
-            const rest = allKeys.filter(k => out.indexOf(k) === -1 && missed.indexOf(k) === -1);
-            bagm = sample(missed, missed.length);
-            bag = sample(rest, rest.length);
-            if (!bagm.length && !bag.length) break;
+        let unseen = allKeys.filter(k => !shownSet.has(k) && out.indexOf(k) === -1);
+        if (!unseen.length) {
+            exhausted = true;
+            allKeys.forEach(k => shownSet.delete(k));
+            unseen = allKeys.filter(k => out.indexOf(k) === -1);
+            if (!unseen.length) break;
         }
-        const arr = bagm.length ? bagm : bag;
-        let i = Math.floor(Math.random() * arr.length);
-        if (avoid != null && arr[i] === avoid && (arr.length > 1 || out.length > 0 || bag.length + bagm.length > 1)) {
-            const j = arr.findIndex(k => k !== avoid && out.indexOf(k) === -1);
-            if (j === -1) break;
-            i = j;
-        }
-        out.push(arr.splice(i, 1)[0]);
+        const missed = missFn ? missFn().filter(k => unseen.indexOf(k) !== -1) : [];
+        let key = null;
+        if (missed.length) {
+            key = drawOne(missed, avoid);
+            if (key === avoid) { const alt = unseen.filter(k => k !== avoid); if (alt.length) key = drawOne(alt, null); }
+        } else key = drawOne(unseen, avoid);
+        if (key == null) break;
+        out.push(key);
+        shownSet.add(key);
     }
-    lsetS('bag', bag, scope); lsetS('bagm', bagm, scope);
+    lsetS('shown', [...shownSet].concat(stale).slice(-300), scope);
     return { keys: out, exhausted };
 }
-/* För stora genererade frågerum: håll reda på visade, börja om när allt setts. */
-function genPick(gen, scope) {
-    let seen = lgetS('seen', [], scope);
-    if (!Array.isArray(seen)) seen = [];
-    const S = new Set(seen);
-    let q = null, tries = 0;
-    do { q = gen(); tries++; } while (S.has(q.key) && tries < 60);
-    if (S.has(q.key)) { game.exhausted = true; seen = []; }
-    seen.push(q.key);
-    if (seen.length > 800) seen = seen.slice(-800);
-    lsetS('seen', seen, scope);
-    game.review = lget('miss', []).indexOf(q.key) !== -1;
-    return q;
-}
+
 function exhaustNote() {
     if (!game.exhausted) return null;
     const d = el('div', 'nx-exhaust');
@@ -1388,7 +1383,7 @@ function gBallong() {
     const useFig = game.round % 2 === 0;
     const sv = [game.cat, settings.cardCount, settings.minRange, settings.maxRange];
     let built;
-    try { game.cat = useFig ? 'figurer' : 'siffror'; settings.cardCount = n; settings.minRange = 1; settings.maxRange = Math.max([5, 10, 20, 30][L - 1], n * 2); built = buildRound('ballong' + (useFig ? ':fig' : ':sif')); }
+    try { game.cat = useFig ? 'figurer' : 'siffror'; settings.cardCount = n; settings.minRange = 1; settings.maxRange = Math.max([5, 10, 20, 30][L - 1], n * 2); built = buildRound('ballong:' + (useFig ? 'fig' : 'sif')); }
     finally { game.cat = sv[0]; settings.cardCount = sv[1]; settings.minRange = sv[2]; settings.maxRange = sv[3]; }
     const vals = built.values || [];
     const target = vals.find(v => v.key === built.targetKey) || pick(vals);
@@ -1449,7 +1444,7 @@ function gKlockan() {
     const mode = 'set';
     const msL = [[0], [0, 30], [0, 15, 30, 45]][L - 1], keysL = [];
     msL.forEach(mm => { for (let hh = 1; hh <= 12; hh++) keysL.push(mode + ':' + hh + ':' + mm); });
-    const drawn = bagTake(keysL, 1, game.lastKey, 'klockan:L' + L, () => lget('miss', []));
+    const drawn = bagTake(keysL, 1, game.lastKey, 'klockan', () => lget('miss', []));
     game.exhausted = drawn.exhausted;
     const kp = drawn.keys[0].split(':');
     const q = { mode, h: +kp[1], m: +kp[2], key: drawn.keys[0] };
@@ -1507,7 +1502,7 @@ function gKlockan2() {
     const L = Math.min(3, lvl());
     const msL = [[0], [0, 30], [0, 15, 30, 45]][L - 1], keysL = [];
     msL.forEach(mm => { for (let hh = 1; hh <= 12; hh++) keysL.push('in:' + hh + ':' + mm); });
-    const drawn = bagTake(keysL, 1, game.lastKey, 'klockan2:L' + L, () => lget('miss', []));
+    const drawn = bagTake(keysL, 1, game.lastKey, 'klockan2', () => lget('miss', []));
     game.exhausted = drawn.exhausted;
     const kp = drawn.keys[0].split(':');
     const q = { h: +kp[1], m: +kp[2], key: drawn.keys[0] };
@@ -1549,13 +1544,15 @@ function gKlockan2() {
 /* --- Textuppgifter --- */
 function gText() {
     const L = lvl();
-    const q = genPick(() => {
-        const sub = L >= 3 && (L === 3 || Math.random() < 0.5); let a, b, g = 0;
-        if (!sub) { const max = [6, 8, 12, 12][L - 1]; do { a = 2 + rn(max - 3); b = 2 + rn(max - 3); } while (a + b > max && g++ < 100); if (a + b > max) { a = 2; b = 2; } }
-        else { a = 4 + rn(9); b = 2 + rn(a - 3); }
-        const o = rn(NXOBJ.length);
-        return { a, b, sub, o, key: a + (sub ? '-' : '+') + b + ':' + o };
-    }, 'text:L' + L);
+    const keysT = [];
+    const addMax = [6, 8, 12, 12][L - 1];
+    if (L !== 3) for (let a = 2; a <= addMax - 1; a++) for (let b = 2; b <= addMax - 1 && a + b <= addMax; b++) for (let o = 0; o < NXOBJ.length; o++) keysT.push(a + '+' + b + ':' + o);
+    if (L >= 3) for (let a = 4; a <= 12; a++) for (let b = 2; b <= a - 2; b++) for (let o = 0; o < NXOBJ.length; o++) keysT.push(a + '-' + b + ':' + o);
+    const drawn = bagTake(keysT, 1, game.lastKey, 'text', () => lget('miss', []));
+    game.exhausted = drawn.exhausted;
+    game.review = lget('miss', []).indexOf(drawn.keys[0]) !== -1;
+    const tp = drawn.keys[0].split(':'), tab = tp[0].split(/[+-]/);
+    const q = { a: +tab[0], b: +tab[1], sub: tp[0].indexOf('-') !== -1, o: +tp[1], key: drawn.keys[0] };
     const body = nxFrame();
     game.lastKey = q.key;
     const { a, b, sub, o } = q, ans = sub ? a - b : a + b, ob = NXOBJ[o], objName = lang === 'ar' ? ob[2] : ob[1];
@@ -1591,15 +1588,29 @@ function gText() {
 /* --- Mönster --- */
 function gMonster() {
     const L = lvl();
-    const q = genPick(() => {
-        if (L < 4) {
-            const t = sample(NXTOK, L === 3 ? 3 : 2); const shape = L === 1 ? [0, 1, 0, 1, 0, 1] : L === 2 ? (Math.random() < 0.5 ? [0, 0, 1, 0, 0, 1] : [0, 1, 1, 0, 1, 1]) : [0, 1, 2, 0, 1, 2];
-            const full = shape.map(i => t[i]);
-            return { kind: 'tok', shown: full.slice(0, 5), ans: full[5], set: t, key: 'p' + shape.join('') + t.join('') };
-        }
-        const step = pick([2, 3, 5, 10]), start = 1 + rn(10), seq = [0, 1, 2, 3, 4].map(i => start + i * step);
-        return { kind: 'num', shown: seq.slice(0, 4), ans: seq[4], step, key: 'n' + start + ':' + step };
-    }, 'monster:L' + L);
+    const keysM = [];
+    if (L < 4) {
+        const shapes = L === 1 ? [[0, 1, 0, 1, 0, 1]] : L === 2 ? [[0, 0, 1, 0, 0, 1], [0, 1, 1, 0, 1, 1]] : [[0, 1, 2, 0, 1, 2]];
+        shapes.forEach(sh => {
+            if (L === 3) { for (let i = 0; i < NXTOK.length; i++) for (let j = 0; j < NXTOK.length; j++) { if (j === i) continue; for (let k = 0; k < NXTOK.length; k++) { if (k === i || k === j) continue; keysM.push('p' + sh.join('') + ':' + i + ',' + j + ',' + k); } } }
+            else { for (let i = 0; i < NXTOK.length; i++) for (let j = 0; j < NXTOK.length; j++) { if (j === i) continue; keysM.push('p' + sh.join('') + ':' + i + ',' + j); } }
+        });
+    } else {
+        [2, 3, 5, 10].forEach(step => { for (let start = 1; start <= 10; start++) keysM.push('n' + start + ':' + step); });
+    }
+    const drawn = bagTake(keysM, 1, game.lastKey, 'monster', () => lget('miss', []));
+    game.exhausted = drawn.exhausted;
+    game.review = lget('miss', []).indexOf(drawn.keys[0]) !== -1;
+    let q;
+    const mk2 = drawn.keys[0];
+    if (mk2[0] === 'p') {
+        const pp = mk2.split(':'), shape = pp[0].slice(1).split('').map(Number), t = pp[1].split(',').map(i => NXTOK[+i]);
+        const full = shape.map(i => t[i]);
+        q = { kind: 'tok', shown: full.slice(0, 5), ans: full[5], set: t, key: mk2 };
+    } else {
+        const np = mk2.slice(1).split(':'), start = +np[0], step = +np[1], seq = [0, 1, 2, 3, 4].map(i => start + i * step);
+        q = { kind: 'num', shown: seq.slice(0, 4), ans: seq[4], step, key: mk2 };
+    }
     const body = nxFrame();
     game.lastKey = q.key;
     body.appendChild(promptBar(TT('Vad kommer sen?'), '', () => sayParts([TT('Vad kommer sen?')])));
@@ -1663,7 +1674,7 @@ function gKroppen() {
   const names = {}; localizeList(BODY).forEach(([f, n]) => { names[f] = n; });
   const scene = L >= 3 && game.round % 2 === 0 ? 'body' : 'face';
   const parts = scene === 'body' ? KBODY : (L === 1 ? KFACE.slice(0, 4) : KFACE);
-  const drawn = bagTake(parts.map(p => p[0]), 1, game.lastKey, 'kroppen:' + scene + ':' + parts.length, () => lget('miss', []));
+  const drawn = bagTake(parts.map(p => p[0]), 1, game.lastKey, 'kroppen', () => lget('miss', []));
   game.exhausted = drawn.exhausted;
   const target = parts.find(p => p[0] === drawn.keys[0]);
   game.review = lget('miss', []).indexOf(target[0]) !== -1; game.lastKey = target[0]; game.locked = false;
