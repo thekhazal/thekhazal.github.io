@@ -94,8 +94,8 @@
             body.appendChild(eq);
         }
 
-        const W = Math.min(innerWidth - 24, 430);
-        const SZ = 44;
+        const W = Math.min(innerWidth - 24, (innerWidth >= 700 && innerHeight >= 700) ? 640 : 430);
+        const SZ = (innerWidth >= 700 && innerHeight >= 700) ? 60 : 44;
         const stage = el('div', 'nx-stage');
         stage.style.width = W + 'px'; stage.style.margin = '8px auto';
         body.appendChild(stage);

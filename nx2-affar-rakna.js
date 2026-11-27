@@ -278,12 +278,12 @@
         const plural = target !== 1;
         const promptText = celia
             ? (start < target ? T('Lägg till så det blir') : T('Ta bort så det blir')) + ' ' + numW(target)
-            : T('Lägg') + ' ' + numW(target) + ' ' + itemName(face, plural) + ' ' + T('i korgen');
+            : (lang === 'ar' ? T('Lägg') + ' ' + numW(target) + ' ' + itemName(face, plural) + ' ' + T('i korgen') : 'Lägg ' + itemCounted(face, target) + ' i korgen');
         const body = nxFrame();
         body.appendChild(promptBar(promptText, '', () => speak(promptText)));
 
-        const W = Math.min(innerWidth - 24, 430);
-        const SZ = Math.max(48, Math.min(64, Math.floor((W - 40) / 6)));
+        const W = Math.min(innerWidth - 24, (innerWidth >= 700 && innerHeight >= 700) ? 640 : 430);
+        const SZ = (innerWidth >= 700 && innerHeight >= 700) ? 84 : Math.max(48, Math.min(64, Math.floor((W - 40) / 6)));
         const stage = el('div', 'nx-stage');
         stage.style.width = W + 'px'; stage.style.margin = '8px auto';
         body.appendChild(stage);
@@ -293,7 +293,7 @@
         basket.appendChild(el('div', 'b-label', '🧺'));
         stage.appendChild(basket);
         const countEl = el('div', 'nx-count', ''); stage.appendChild(countEl);
-        const shelfTop = basketH + 34;
+        const shelfTop = basketH + ((innerWidth >= 700 && innerHeight >= 700) ? 52 : 34);
 
         const nWrong = face2 ? Math.max(2, Math.floor(target / 2)) : 0;
         const nShelf = Math.max(0, target - start) + 2;

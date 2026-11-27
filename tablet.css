@@ -1,0 +1,54 @@
+/* Surfplatta (iPad): större text, knappar och spelytor. Telefon påverkas inte. */
+@media (min-width: 700px) and (min-height: 700px) {
+  #app { max-width: 980px; padding: 20px 28px 60px; }
+  #app .gamehead { gap: 16px; padding-bottom: 14px; }
+  #app .gamehead h2 { font-size: 32px; }
+  #app .icon-btn { width: 60px; height: 60px; font-size: 26px; border-radius: 18px; }
+  #app .stars { font-size: 30px; }
+  #app .brand { font-size: 26px; }
+  #app .profile-switch { font-size: 20px; padding: 12px 20px; }
+  #app .tiles { gap: 20px; }
+  #app .tile .emoji { font-size: 56px; }
+  #app .tile .label { font-size: 24px; }
+  #app .tile .sub { font-size: 16px; }
+  #app .prompt { min-height: 130px; padding: 20px 26px; }
+  #app .prompt .text .lead { font-size: 26px; font-weight: 700; }
+  #app .prompt .text .name:not(.target-value) { font-size: 34px; }
+  #app .speak-btn { width: 72px; height: 72px; font-size: 32px; }
+  #app .keypad { max-width: 520px; gap: 14px; }
+  #app .key { height: 88px; font-size: 44px; border-radius: 22px; }
+  #app .math-eq, #app .math-q { font-size: 64px; }
+  #app .card { max-height: none; }
+  #app .grid { gap: 18px; }
+  #app .grid.n2 .card { max-height: 320px; }
+  #app .shop-list { padding: 18px 24px; }
+  #app .shop-row { font-size: 30px; padding: 10px 2px; }
+  #app .shop-row .s-emo { font-size: 44px; }
+  #app .shop-row .s-price { font-size: 26px; }
+  #app .shop-shelf { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 14px; }
+  #app .shop-card { min-height: 120px; font-size: 56px; }
+  #app .shop-card .badge { font-size: 20px; padding: 2px 12px; }
+  #app .nx-count { font-size: 26px; }
+  #app .dela-eq { font-size: 44px; }
+  #app .dz .dz-face { font-size: 44px; }
+  #app .dz .dz-count { font-size: 20px; }
+  #app .why-title { font-size: 26px; }
+  #app .why-btn, #app .why-close { font-size: 24px; padding: 14px 30px; }
+  #app .why-line { font-size: 44px; }
+  #app .why-bowl { font-size: 34px; }
+  #app .why-count { font-size: 56px; }
+  #app .why-eq { font-size: 46px; }
+  #app .nx-pad { max-width: 520px; gap: 14px; margin: 14px auto; }
+  #app .nx-key { height: 86px; font-size: 42px; border-radius: 22px; }
+  #app .nx-timein { font-size: 52px; }
+  #app .nx-tf { height: 84px; min-width: 150px; font-size: 44px; }
+  #app .prompt .text .lead { font-size: 30px; }
+}
+
+@media (min-width: 700px) and (min-height: 700px) and (max-height: 900px) {
+  #app .prompt { min-height: 90px; padding: 12px 22px; }
+  #app .keypad, #app .nx-pad { max-width: 440px; gap: 10px; }
+  #app .key, #app .nx-key { height: 62px; font-size: 34px; }
+  #app .nx-tf { height: 66px; }
+  #app .math-eq, #app .math-q { font-size: 52px; }
+}

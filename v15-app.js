@@ -255,6 +255,7 @@ const voiceAudio = new Audio();
 let audioMap = {};
 const clipLoads = ['sa-01.json', 'sa-02.json', 'sa-03.json', 'sa-04.json', 'sa-05.json', 'sa-06.json', 'sa-07.json', 'sa-08.json', 'sa-09.json', 'sa-10.json', 'sa-11.json', 'sa-12.json', 'sa-13.json', 'sa-14.json', 'sa-15.json', 'sa-16.json', 'sa-17.json', 'sa-18.json', 'sa-19.json', 'sa-20.json', 'sa-21.json', 'sa-22.json', 'sa-23.json', 'sa-24.json', 'sa-25.json', 'sa-26.json', 'sa-27.json', 'sa-28.json', 'sa-29.json', 'sa-30.json'].map(u => fetch(u + '?v=7').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {}));
 for (let i = 1; i <= 2; i++) clipLoads.push(fetch('sp2-' + i + '.json?v=10').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {}));
+clipLoads.push(fetch('nx-sofie.json?v=1').then(r => r.ok ? r.json() : {}).then(data => { Object.assign(audioMap, data); }).catch(() => {}));
 ['sp3-3', 'sp3-4', 'sp3-5', 'sp3-6', 'sp3-7', 'sp3-8', 'sp3-9', 'sp3-10', 'sp3-11', 'sp3-12a', 'sp3-12b', 'sp3-12c', 'sp3-12d', 'sp3-12e'].forEach(nm => clipLoads.push(new Promise(res => { const sc = document.createElement('script'); sc.src = nm + '.js?v=12'; sc.onload = () => { Object.assign(audioMap, window.__clips || {}); res(); }; sc.onerror = () => res(); document.head.appendChild(sc); })));
 let arClipsRequested = false;
 let audioBooted = false;
@@ -365,7 +366,7 @@ function speak(text) {
             } catch(e) { done(); }
         };
         if (audioMap[text]) {
-            voiceAudio.src = audioMap[text]; voiceAudio.volume = settings.volume; voiceAudio.playbackRate = 1.1;
+            voiceAudio.src = audioMap[text]; voiceAudio.volume = settings.volume; voiceAudio.playbackRate = 1;
             voiceAudio.onended = done; voiceAudio.onerror = fallback;
             voiceAudio.play().catch(fallback);
         } else fallback();
@@ -397,7 +398,7 @@ function waSeq(parts, fallbackText) {
     return Promise.all(parts.map(waTrim)).then(items => new Promise(resolve => {
         if (token !== speechToken) return resolve();
         talking = true; applyMusic();
-        const rate = 1.12, gap = 0.04, g = actx.createGain(); g.gain.value = settings.volume; g.connect(actx.destination);
+        const rate = 1, gap = 0.04, g = actx.createGain(); g.gain.value = settings.volume; g.connect(actx.destination);
         let t = actx.currentTime + 0.02, last = null; const t0 = t;
         items.forEach((it, i) => {
             const src = actx.createBufferSource(); src.buffer = it.buf; src.playbackRate.value = rate; src.connect(g);
@@ -431,7 +432,7 @@ function speakSeqOld(parts, fallbackText) {
         const next = () => {
             if (token !== speechToken || i >= parts.length) return done();
             voiceAudio.src = audioMap[parts[i++]]; voiceAudio.volume = settings.volume;
-            voiceAudio.playbackRate = 1.12; voiceAudio.onended = next; voiceAudio.onerror = done;
+            voiceAudio.playbackRate = 1; voiceAudio.onended = next; voiceAudio.onerror = done;
             voiceAudio.play().catch(done);
         };
         next();
